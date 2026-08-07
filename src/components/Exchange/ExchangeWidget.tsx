@@ -1,0 +1,678 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ArrowDownUp, 
+  CreditCard, 
+  QrCode, 
+  ShieldAlert, 
+  ShieldCheck, 
+  Zap, 
+  Clock, 
+  Copy, 
+  ChevronDown, 
+  Info,
+  CheckCircle2,
+  Sparkles,
+  AlertTriangle,
+  ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  Building2,
+  Wallet
+} from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { CryptoNetwork, PaymentMethod } from '../../types';
+import { api } from '../../services/api';
+
+export const ExchangeWidget: React.FC = () => {
+  const { 
+    t, 
+    user, 
+    rates, 
+    selectedRate, 
+    setSelectedRate, 
+    setIsStripeModalOpen, 
+    setIsVietQRModalOpen, 
+    setActiveOrder, 
+    setIsOrderConfirmOpen,
+    setIsKYCModalOpen,
+    addNotification
+  } = useApp();
+
+  // Exchange trade mode: 'buy' (VND -> Crypto) | 'sell' (Crypto -> VND)
+  const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
+  
+  // Amounts
+  const [fiatAmountVND, setFiatAmountVND] = useState<number>(2607000); // ~100 USDT
+  const [cryptoAmount, setCryptoAmount] = useState<number>(100);
+  
+  const [selectedNetwork, setSelectedNetwork] = useState<CryptoNetwork>('TRC20');
+  const [recipientWallet, setRecipientWallet] = useState<string>('TYDzsYbm7xXG7xKvZ1Rmqw76sXb484X9Jk');
+  
+  // Bank Payout details for 'sell' mode
+  const [bankName, setBankName] = useState<string>(user.bankAccount?.bankName || 'Vietcombank (VCB)');
+  const [accountNumber, setAccountNumber] = useState<string>(user.bankAccount?.accountNumber || '10188992233');
+  const [accountName, setAccountName] = useState<string>(user.bankAccount?.accountName || 'NGUYEN VAN AN');
+
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe_card');
+  const [lockTimer, setLockTimer] = useState<number>(30);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [showP2PComparison, setShowP2PComparison] = useState(false);
+
+  // Rate lock timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLockTimer(prev => (prev > 1 ? prev - 1 : 30));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update selected network when crypto rate changes
+  useEffect(() => {
+    if (selectedRate.networks && selectedRate.networks.length > 0) {
+      setSelectedNetwork(selectedRate.networks[0].network);
+    }
+  }, [selectedRate.symbol]);
+
+  // Active rate depending on buy vs sell
+  const activeRateVND = tradeMode === 'buy' ? selectedRate.buyPriceVND : selectedRate.sellPriceVND;
+  const activeNetworkConfig = selectedRate.networks.find(n => n.network === selectedNetwork) || selectedRate.networks[0];
+  const networkFeeVND = tradeMode === 'buy' ? (activeNetworkConfig?.feeVND || 25000) : 0;
+  const gatewayFeeVND = (tradeMode === 'buy' && paymentMethod.startsWith('stripe')) ? Math.round(fiatAmountVND * 0.01) : 0;
+  const totalPaymentVND = fiatAmountVND + networkFeeVND + gatewayFeeVND;
+
+  // Handle fiat input change
+  const handleFiatChange = (val: number) => {
+    setFiatAmountVND(val);
+    if (activeRateVND > 0) {
+      const calculated = val / activeRateVND;
+      setCryptoAmount(Number(calculated < 0.001 ? calculated.toFixed(6) : calculated < 1 ? calculated.toFixed(4) : calculated.toFixed(2)));
+    }
+  };
+
+  // Handle crypto input change
+  const handleCryptoChange = (val: number) => {
+    setCryptoAmount(val);
+    if (activeRateVND > 0) {
+      setFiatAmountVND(Math.round(val * activeRateVND));
+    }
+  };
+
+  // Sync crypto amount when rate or tradeMode toggles
+  useEffect(() => {
+    if (activeRateVND > 0 && fiatAmountVND > 0) {
+      const calculated = fiatAmountVND / activeRateVND;
+      setCryptoAmount(Number(calculated < 0.001 ? calculated.toFixed(6) : calculated < 1 ? calculated.toFixed(4) : calculated.toFixed(2)));
+    }
+  }, [activeRateVND, tradeMode]);
+
+  // KYC validation
+  const remainingQuota = Math.max(0, user.monthlyLimitVND - user.monthlyUsedVND);
+  const isTier0 = user.kycTier === 'tier0_unverified';
+  const isExceedingQuota = (user.monthlyUsedVND + fiatAmountVND) > user.monthlyLimitVND;
+
+  const quickAmounts = [
+    { label: '500.000 ₫', value: 500000 },
+    { label: '2.607.000 ₫ (100$)', value: 2607000 },
+    { label: '5.000.000 ₫', value: 5000000 },
+    { label: '10.000.000 ₫', value: 10000000 },
+  ];
+
+  const handleProceed = async () => {
+    setOrderError(null);
+
+    if (isTier0) {
+      setOrderError(t('kycRequiredNotice'));
+      setIsKYCModalOpen(true);
+      return;
+    }
+
+    if (tradeMode === 'buy') {
+      if (isExceedingQuota) {
+        setOrderError(t('exceedLimit'));
+        return;
+      }
+
+      if (!recipientWallet.trim()) {
+        setOrderError('Vui lòng nhập địa chỉ ví nhận crypto!');
+        return;
+      }
+    } else {
+      // Sell Mode Validation
+      if (!accountNumber.trim() || !bankName.trim() || !accountName.trim()) {
+        setOrderError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng nhận tiền VND!');
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (tradeMode === 'buy') {
+        const res = await api.createOrder({
+          type: 'buy_crypto',
+          cryptoSymbol: selectedRate.symbol,
+          network: selectedNetwork,
+          fiatAmountVND,
+          cryptoAmount,
+          recipientWallet: recipientWallet.trim(),
+          paymentMethod
+        });
+
+        if (res.success && res.order) {
+          setActiveOrder(res.order);
+          if (paymentMethod.startsWith('stripe')) {
+            setIsStripeModalOpen(true);
+          } else {
+            setIsVietQRModalOpen(true);
+          }
+        } else {
+          setOrderError(res.message || res.error || 'Tạo đơn hàng không thành công');
+        }
+      } else {
+        // Sell Mode
+        const res = await api.createOrder({
+          type: 'sell_crypto',
+          cryptoSymbol: selectedRate.symbol,
+          network: selectedNetwork,
+          fiatAmountVND,
+          cryptoAmount,
+          bankPayout: {
+            bankName,
+            accountNumber,
+            accountName
+          },
+          paymentMethod: 'crypto_deposit'
+        });
+
+        if (res.success && res.order) {
+          setActiveOrder(res.order);
+          setIsOrderConfirmOpen(true);
+          addNotification(
+            'crypto_sent',
+            'Đơn bán Crypto đã khởi tạo!',
+            `Vui lòng chuyển ${cryptoAmount} ${selectedRate.symbol} (${selectedNetwork}) vào ví ký quỹ để nhận ${fiatAmountVND.toLocaleString('vi-VN')} VND về ngân hàng.`
+          );
+        } else {
+          setOrderError(res.message || res.error || 'Tạo đơn bán không thành công');
+        }
+      }
+    } catch (err: any) {
+      setOrderError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* Main Exchange Card */}
+      <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl shadow-slate-950/80 backdrop-blur-xl relative">
+        {/* Background ambient glow */}
+        <div className="absolute -top-10 -right-10 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Trade Mode Toggle Tabs (Mua Crypto vs Bán Crypto) */}
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800 mb-5">
+          <button
+            id="tab-buy-crypto"
+            onClick={() => setTradeMode('buy')}
+            className={`py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center space-x-2 ${
+              tradeMode === 'buy'
+                ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-lg shadow-cyan-600/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-cyan-300" />
+            <span>{t('buyCryptoTab')}</span>
+          </button>
+
+          <button
+            id="tab-sell-crypto"
+            onClick={() => setTradeMode('sell')}
+            className={`py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center space-x-2 ${
+              tradeMode === 'sell'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <TrendingDown className="w-4 h-4 text-emerald-300" />
+            <span>{t('sellCryptoTab')}</span>
+          </button>
+        </div>
+
+        {/* Live Exchange Rate Status Banner */}
+        <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-900 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 flex-shrink-0">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-semibold text-white flex items-center space-x-2">
+                <span>{tradeMode === 'buy' ? 'Tỷ giá MUA (NEXUS bán cho bạn)' : 'Tỷ giá BÁN (NEXUS thu mua từ bạn)'}</span>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold ${
+                  tradeMode === 'buy' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  1 {selectedRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Xử lý thanh toán tự động 24/7 • Giao dịch chuỗi khối bảo đảm không qua trung gian
+              </p>
+            </div>
+          </div>
+
+          <button
+            id="toggle-p2p-comparison-btn"
+            onClick={() => setShowP2PComparison(!showP2PComparison)}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-cyan-300 text-xs font-semibold border border-slate-700 whitespace-nowrap transition-colors flex items-center space-x-1"
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>{showP2PComparison ? 'Ẩn so sánh thị trường' : 'So sánh tỷ giá thị trường'}</span>
+          </button>
+        </div>
+
+        {/* KYC Limit Banner */}
+        {isTier0 ? (
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex items-start space-x-3 text-xs">
+            <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-200">{t('tier0')}</h4>
+              <p className="text-amber-300/80 mt-0.5">{t('tier0Desc')}</p>
+              <button 
+                id="upgrade-kyc-banner-btn"
+                onClick={() => setIsKYCModalOpen(true)}
+                className="mt-2 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors"
+              >
+                {t('upgradeKyc')} (10M - 300M ₫)
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4 p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="text-slate-300 font-medium">
+                {user.kycTier === 'tier2_advanced' ? t('tier2') : t('tier1')}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400">{t('remainingQuota')}: </span>
+              <span className="text-emerald-400 font-bold font-mono">{remainingQuota.toLocaleString('vi-VN')} ₫</span>
+            </div>
+          </div>
+        )}
+
+        {/* Input / Output Form Body */}
+        <div className="space-y-4">
+          {/* Box 1: Fiat VND */}
+          <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 font-medium">
+              <span>{tradeMode === 'buy' ? t('youPay') : 'Số tiền VND bạn nhận'}</span>
+              <span>Số dư: {user.walletBalance.VND.toLocaleString('vi-VN')} ₫</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                id="fiat-amount-input"
+                type="number"
+                value={fiatAmountVND || ''}
+                onChange={e => handleFiatChange(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
+                className="w-full bg-transparent text-2xl sm:text-3xl font-bold font-mono text-white placeholder-slate-600 focus:outline-none"
+              />
+              <div className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 rounded-xl border border-slate-700 text-sm font-bold text-slate-200 whitespace-nowrap">
+                <span>🇻🇳 VND</span>
+              </div>
+            </div>
+
+            {/* Quick presets */}
+            <div className="flex items-center space-x-2 mt-3 overflow-x-auto scrollbar-none">
+              {quickAmounts.map(q => (
+                <button
+                  key={q.value}
+                  onClick={() => handleFiatChange(q.value)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
+                    fiatAmountVND === q.value
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Swap Divider */}
+          <div className="flex justify-center -my-2 relative z-10">
+            <button
+              onClick={() => setTradeMode(prev => prev === 'buy' ? 'sell' : 'buy')}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-cyan-400 shadow-md transition-transform hover:rotate-180"
+              title="Đổi chiều Mua/Bán"
+            >
+              <ArrowDownUp className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Box 2: Crypto Amount & Selector */}
+          <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 font-medium">
+              <span>{tradeMode === 'buy' ? t('youReceive') : 'Số lượng Crypto bạn bán'}</span>
+              <span>
+                1 {selectedRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <input
+                id="crypto-amount-input"
+                type="number"
+                value={cryptoAmount || ''}
+                onChange={e => handleCryptoChange(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
+                className={`w-full bg-transparent text-2xl sm:text-3xl font-bold font-mono focus:outline-none ${
+                  tradeMode === 'buy' ? 'text-emerald-400' : 'text-cyan-400'
+                }`}
+              />
+
+              {/* Crypto Symbol Picker */}
+              <div className="relative">
+                <select
+                  id="crypto-symbol-select"
+                  value={selectedRate.symbol}
+                  onChange={e => {
+                    const found = rates.find(r => r.symbol === e.target.value);
+                    if (found) setSelectedRate(found);
+                  }}
+                  className="appearance-none bg-gradient-to-r from-cyan-900/60 to-indigo-900/60 border border-cyan-500/40 text-white font-bold text-sm rounded-xl px-4 py-2 pr-8 focus:outline-none cursor-pointer shadow-lg shadow-cyan-950/40"
+                >
+                  {rates.map(r => (
+                    <option key={r.symbol} value={r.symbol} className="bg-slate-900 text-white">
+                      {r.symbol} - {r.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-cyan-300 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Network Selector */}
+            <div className="mt-3 pt-3 border-t border-slate-800/80">
+              <div className="text-[11px] text-slate-400 font-medium mb-1.5 flex items-center justify-between">
+                <span>{t('selectNetwork')}</span>
+                <span className="text-cyan-400 font-mono">Xác thực: ~{activeNetworkConfig?.estimatedSeconds || 30}s</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedRate.networks.map(net => (
+                  <button
+                    key={net.network}
+                    onClick={() => setSelectedNetwork(net.network)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+                      selectedNetwork === net.network
+                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
+                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'
+                    }`}
+                  >
+                    <span>{net.network}</span>
+                    <span className="text-[10px] opacity-80">({net.feeVND.toLocaleString('vi-VN')}₫)</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Conditional Step 3: Destination Configuration */}
+          {tradeMode === 'buy' ? (
+            /* Buy Mode: Recipient Crypto Wallet Address */
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+              <label className="text-xs text-slate-400 font-medium block mb-1.5 flex items-center justify-between">
+                <span>{t('recipientAddress')} ({selectedNetwork})</span>
+                <span className="text-cyan-400">Chuyển tự động 24/7</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="recipient-wallet-input"
+                  type="text"
+                  value={recipientWallet}
+                  onChange={e => setRecipientWallet(e.target.value)}
+                  placeholder={t('recipientAddressPlaceholder')}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 pr-20"
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) setRecipientWallet(text);
+                    } catch (e) {
+                      setRecipientWallet(selectedNetwork === 'TRC20' ? 'TYDzsYbm7xXG7xKvZ1Rmqw76sXb484X9Jk' : '0x71C8A3B2eF90041284A2938491823901238491A2');
+                    }
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-semibold rounded-lg transition-colors"
+                >
+                  Dán (Paste)
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Sell Mode: User's VND Bank Payout Details */
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300 font-semibold flex items-center space-x-1.5">
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                  <span>{t('bankPayoutInfo')}</span>
+                </span>
+                <span className="text-[11px] text-emerald-400 font-medium">Nhận tiền trong 30s</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Tên ngân hàng</label>
+                  <input
+                    type="text"
+                    value={bankName}
+                    onChange={e => setBankName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="VD: Vietcombank, Techcombank..."
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Số tài khoản</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={e => setAccountNumber(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="10188992233"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Tên chủ tài khoản (In hoa không dấu)</label>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={e => setAccountName(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                  placeholder="NGUYEN VAN AN"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Payment Method Selector (Only for Buy Mode) */}
+          {tradeMode === 'buy' && (
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+              <span className="text-xs text-slate-400 font-medium block mb-2.5">Hình thức thanh toán:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Stripe Card */}
+                <button
+                  id="paymethod-stripe-btn"
+                  onClick={() => setPaymentMethod('stripe_card')}
+                  className={`p-3 rounded-2xl border text-left flex items-start space-x-3 transition-all ${
+                    paymentMethod === 'stripe_card'
+                      ? 'bg-gradient-to-br from-indigo-950/80 to-slate-900 border-indigo-500/80 ring-2 ring-indigo-500/20 shadow-lg'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400'
+                  }`}
+                >
+                  <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 mt-0.5">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center space-x-1.5">
+                      <span>Thẻ Quốc Tế / Stripe</span>
+                      <span className="text-[10px] px-1.5 rounded bg-indigo-500/30 text-indigo-300 font-normal">Instant</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Visa, Master, JCB, Apple Pay</p>
+                  </div>
+                </button>
+
+                {/* VietQR Bank Transfer */}
+                <button
+                  id="paymethod-vietqr-btn"
+                  onClick={() => setPaymentMethod('vietqr_bank')}
+                  className={`p-3 rounded-2xl border text-left flex items-start space-x-3 transition-all ${
+                    paymentMethod === 'vietqr_bank'
+                      ? 'bg-gradient-to-br from-emerald-950/80 to-slate-900 border-emerald-500/80 ring-2 ring-emerald-500/20 shadow-lg'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400'
+                  }`}
+                >
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 mt-0.5">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center space-x-1.5">
+                      <span>Chuyển khoản VietQR</span>
+                      <span className="text-[10px] px-1.5 rounded bg-emerald-500/30 text-emerald-300 font-normal">24/7</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Quét QR mọi App ngân hàng</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Fee & Rate Summary */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-1.5 text-xs text-slate-400">
+            <div className="flex justify-between">
+              <span>{t('currentNexusRate')}:</span>
+              <span className="font-mono text-slate-200">1 {selectedRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{t('p2pBenchmarkLabel')} (Binance/Bybit):</span>
+              <span className="font-mono text-cyan-400">{selectedRate.baseP2PVND.toLocaleString('vi-VN')} ₫</span>
+            </div>
+            {tradeMode === 'buy' && (
+              <>
+                <div className="flex justify-between">
+                  <span>{t('networkFee')}:</span>
+                  <span className="font-mono text-slate-200">{networkFeeVND.toLocaleString('vi-VN')} ₫</span>
+                </div>
+                {gatewayFeeVND > 0 && (
+                  <div className="flex justify-between">
+                    <span>{t('gatewayFee')} (1% Stripe):</span>
+                    <span className="font-mono text-slate-200">{gatewayFeeVND.toLocaleString('vi-VN')} ₫</span>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex justify-between pt-1.5 border-t border-slate-800 font-bold text-sm">
+              <span className="text-white">{tradeMode === 'buy' ? t('totalPayment') : 'Tổng VND nhận về tài khoản'}:</span>
+              <span className={`font-mono ${tradeMode === 'buy' ? 'text-cyan-400' : 'text-emerald-400'}`}>
+                {totalPaymentVND.toLocaleString('vi-VN')} ₫
+              </span>
+            </div>
+          </div>
+
+          {/* Error Alert */}
+          {orderError && (
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center space-x-2 text-rose-300 text-xs">
+              <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <span>{orderError}</span>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            id="proceed-payment-submit-btn"
+            disabled={isSubmitting || fiatAmountVND <= 0}
+            onClick={handleProceed}
+            className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-white ${
+              tradeMode === 'buy'
+                ? 'bg-gradient-to-r from-cyan-500 via-indigo-600 to-emerald-500 hover:from-cyan-400 hover:via-indigo-500 hover:to-emerald-400 shadow-cyan-600/30'
+                : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-500 hover:from-emerald-400 hover:via-teal-500 hover:to-cyan-400 shadow-emerald-600/30'
+            }`}
+          >
+            <Zap className="w-5 h-5 text-amber-300 animate-pulse" />
+            <span>
+              {isSubmitting 
+                ? 'Đang khởi tạo đơn hàng...' 
+                : tradeMode === 'buy' 
+                  ? t('proceedToPay') 
+                  : `Xác nhận bán ${cryptoAmount} ${selectedRate.symbol}`}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* P2P Benchmark Comparison Matrix Drawer */}
+      {showP2PComparison && (
+        <div className="w-full bg-slate-900/95 border border-cyan-500/30 rounded-3xl p-5 shadow-2xl backdrop-blur-xl animate-fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center space-x-2">
+              <Zap className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">So sánh tỷ giá trực tiếp với 5 sàn P2P hàng đầu</h3>
+            </div>
+            <span className="text-[11px] text-slate-400">Cập nhật theo thời gian thực</span>
+          </div>
+
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="text-slate-400 border-b border-slate-800/80">
+                  <th className="py-2.5 font-medium">Sàn giao dịch</th>
+                  <th className="py-2.5 font-medium">Tỷ giá Mua (VND)</th>
+                  <th className="py-2.5 font-medium">Tỷ giá Bán (VND)</th>
+                  <th className="py-2.5 font-medium">Tốc độ thanh toán</th>
+                  <th className="py-2.5 font-medium">Phương thức</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 font-mono">
+                {/* NEXUS ACTIVE ROW */}
+                <tr className="bg-cyan-950/40 text-cyan-200 font-bold border-l-2 border-cyan-400">
+                  <td className="py-2.5 pl-2 flex items-center space-x-1.5 font-sans">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>NEXUS GATEWAY</span>
+                  </td>
+                  <td className="py-2.5 text-indigo-300">{selectedRate.buyPriceVND.toLocaleString('vi-VN')} ₫</td>
+                  <td className="py-2.5 text-emerald-300">{selectedRate.sellPriceVND.toLocaleString('vi-VN')} ₫</td>
+                  <td className="py-2.5 font-sans">
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px]">Tức thì (15-30s)</span>
+                  </td>
+                  <td className="py-2.5 text-slate-300 text-[11px] font-sans">Stripe Card / VietQR 247</td>
+                </tr>
+
+                {selectedRate.p2pExchanges?.map(ex => (
+                  <tr key={ex.exchange} className="hover:bg-slate-850/60 text-slate-300">
+                    <td className="py-2.5 font-sans font-medium text-white">{ex.exchange}</td>
+                    <td className="py-2.5">{ex.p2pBuyVND.toLocaleString('vi-VN')} ₫</td>
+                    <td className="py-2.5">{ex.p2pSellVND.toLocaleString('vi-VN')} ₫</td>
+                    <td className="py-2.5 font-sans text-slate-400">3 - 15 phút (Chờ người bán)</td>
+                    <td className="py-2.5 text-[11px] font-sans text-slate-400">{ex.paymentMethods.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3.5 p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+            <strong className="text-slate-200">Tại sao chọn NEXUS Gateway thay vì P2P sàn?</strong>
+            <ul className="list-disc list-inside mt-1 space-y-0.5 text-slate-400">
+              <li>100% tự động qua Hợp đồng thông minh & Ngân hàng chính chủ, tuyệt đối không bị khóa tài khoản ngân hàng do dòng tiền bẩn.</li>
+              <li>Thanh toán thẻ Visa/Mastercard toàn cầu qua Stripe hoặc VietQR Napas247 tức thì trong 15-30 giây.</li>
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

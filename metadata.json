@@ -1,0 +1,6 @@
+{
+  "name": "NEXUS Pay & Crypto Gateway",
+  "description": "Cổng thanh toán trực tuyến bảo mật đa tiền tệ (VND/USD & USDT/Crypto) tích hợp Stripe API, xác thực chuỗi khối tự động, báo cáo doanh thu quản trị, KYC phân tầng và hỗ trợ trực tuyến 24/7.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
