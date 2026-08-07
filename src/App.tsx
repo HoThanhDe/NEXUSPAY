@@ -16,6 +16,7 @@ import { KYCCenterModal } from './components/KYC/KYCCenterModal';
 import { SecuritySettingsModal } from './components/Security/SecuritySettingsModal';
 import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { AdminAuthModal } from './components/Admin/AdminAuthModal';
+import { UserAuthModal } from './components/Auth/UserAuthModal';
 import { UserProfileView } from './components/User/UserProfileView';
 import { SupportChatModal } from './components/Support/SupportChatModal';
 import { 
@@ -126,6 +127,7 @@ const MainContent: React.FC = () => {
       <SecuritySettingsModal />
       <SupportChatModal />
       <AdminAuthModal />
+      <UserAuthModal />
 
       {/* Floating 24/7 AI Support Trigger */}
       <button

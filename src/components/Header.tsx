@@ -15,7 +15,10 @@ import {
   Headphones,
   CheckCircle2,
   AlertCircle,
-  User
+  User,
+  LogIn,
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Language } from '../types';
@@ -31,6 +34,10 @@ export const Header: React.FC = () => {
     setActiveTab, 
     isAdminUnlocked,
     setIsAdminAuthModalOpen,
+    isUserAuthModalOpen,
+    setIsUserAuthModalOpen,
+    isUserLoggedIn,
+    logoutUserAccount,
     notifications, 
     unreadCount, 
     markNotificationsAsRead,
@@ -112,8 +119,9 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - Dynamically adapted for Guest vs Logged-in User vs Admin */}
         <nav className="hidden lg:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+          {/* Mua Crypto */}
           <button
             id="nav-exchange-btn"
             onClick={() => setActiveTab('exchange')}
@@ -124,9 +132,10 @@ export const Header: React.FC = () => {
             }`}
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />
-            <span>{t('exchange')}</span>
+            <span>Mua Crypto</span>
           </button>
 
+          {/* Thị trường */}
           <button
             id="nav-market-btn"
             onClick={() => setActiveTab('market')}
@@ -137,9 +146,10 @@ export const Header: React.FC = () => {
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
-            <span>{t('market')}</span>
+            <span>Thị Trường</span>
           </button>
 
+          {/* Lịch sử */}
           <button
             id="nav-history-btn"
             onClick={() => setActiveTab('history')}
@@ -150,63 +160,87 @@ export const Header: React.FC = () => {
             }`}
           >
             <History className="w-3.5 h-3.5" />
-            <span>{t('history')}</span>
+            <span>Lịch Sử</span>
           </button>
 
-          {/* User Profile View Shortcut */}
-          <button
-            id="nav-profile-btn"
-            onClick={() => setActiveTab('profile')}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'profile'
-                ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <User className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Tài Khoản & KYC</span>
-          </button>
+          {/* If Logged in User: Show KYC & Hồ sơ */}
+          {isUserLoggedIn ? (
+            <>
+              {/* KYC */}
+              <button
+                id="nav-kyc-btn"
+                onClick={() => setIsKYCModalOpen(true)}
+                className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/20 transition-all"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>KYC</span>
+              </button>
 
-          <button
-            id="nav-kyc-btn"
-            onClick={() => setIsKYCModalOpen(true)}
-            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t('kyc')}</span>
-          </button>
+              {/* Hồ sơ */}
+              <button
+                id="nav-profile-btn"
+                onClick={() => setActiveTab('profile')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'profile'
+                    ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <User className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Hồ Sơ</span>
+              </button>
+            </>
+          ) : (
+            /* If Guest (Chưa đăng nhập): Show Đăng nhập */
+            <button
+              id="nav-guest-auth-btn"
+              onClick={() => setIsUserAuthModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-300 hover:text-white hover:bg-cyan-950/40 border border-cyan-500/20 transition-all"
+            >
+              <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Đăng Nhập</span>
+            </button>
+          )}
 
-          <button
-            id="nav-security-btn"
-            onClick={() => setIsSecurityModalOpen(true)}
-            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all"
-          >
-            <Lock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{t('security')}</span>
-          </button>
-
-          <button
-            id="nav-admin-btn"
-            onClick={() => {
-              if (isAdminUnlocked) {
-                setActiveTab('admin');
-              } else {
-                setIsAdminAuthModalOpen(true);
-              }
-            }}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'admin'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30'
-                : 'text-purple-300 hover:text-purple-200 hover:bg-purple-950/40'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 text-purple-400" />
-            <span>{t('admin')} {isAdminUnlocked ? '' : '🔒'}</span>
-          </button>
+          {/* Admin Desk Tab - Shown when admin is unlocked */}
+          {isAdminUnlocked && (
+            <button
+              id="nav-admin-btn"
+              onClick={() => setActiveTab('admin')}
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30'
+                  : 'text-purple-300 hover:text-purple-200 hover:bg-purple-950/40'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-purple-400" />
+              <span>Dashboard Admin</span>
+            </button>
+          )}
         </nav>
 
-        {/* Right Actions: KYC Status, Wallet Balance, Language, Notifs, Support */}
+        {/* Right Actions: KYC Status, Wallet Balance, Admin Portal Entry, Language, Notifs */}
         <div className="flex items-center space-x-2.5">
+          {/* Discreet Admin Lock/Portal Entry */}
+          {!isAdminUnlocked ? (
+            <button
+              id="admin-discreet-portal-btn"
+              onClick={() => setIsAdminAuthModalOpen(true)}
+              className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500/40 text-slate-400 hover:text-purple-300 transition-colors"
+              title="Cổng Quản Trị Viên (Mật mã / PIN)"
+            >
+              <Lock className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-purple-950/70 border border-purple-500/50 text-purple-300 hover:bg-purple-900/60 text-xs font-bold transition-all shadow-sm"
+              title="Bàn làm việc Quản trị viên đang mở"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">Admin Desk</span>
+            </button>
+          )}
           {/* KYC Meter Pill */}
           <div 
             id="kyc-status-pill"
@@ -235,6 +269,66 @@ export const Header: React.FC = () => {
               <div className="text-xs font-mono font-bold text-white">{user.walletBalance.USDT.toFixed(2)} USDT</div>
             </div>
           </div>
+
+          {/* User Account / Trader Login & Register Buttons */}
+          {user && user.email && isUserLoggedIn ? (
+            <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-xl p-1 shadow-sm">
+              <button
+                id="header-user-profile-btn"
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className="flex items-center space-x-1.5 px-2.5 py-1 text-xs text-slate-200 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Xem thông tin tài khoản và trạng thái KYC"
+              >
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 text-white flex items-center justify-center font-bold text-[10px]">
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="text-left leading-tight hidden sm:block">
+                  <span className="max-w-[100px] truncate text-slate-200 font-semibold block text-xs">
+                    {user.name}
+                  </span>
+                  <span className={`text-[9px] font-bold block ${
+                    user.kycStatus === 'verified' ? 'text-emerald-400' : user.kycStatus === 'pending' ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {user.kycStatus === 'verified' ? (user.kycTier === 'tier2_advanced' ? '✓ KYC Cấp 2' : '✓ KYC Cấp 1') : user.kycStatus === 'pending' ? '⏳ Chờ duyệt' : '⚠️ Chưa KYC'}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                id="header-logout-btn"
+                type="button"
+                onClick={logoutUserAccount}
+                className="flex items-center space-x-1 px-2.5 py-1 text-slate-300 hover:text-rose-400 rounded-lg bg-slate-950/60 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/50 text-xs font-semibold transition-all shadow-sm"
+                title="Đăng xuất tài khoản an toàn"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden md:inline">Đăng Xuất</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1.5">
+              <button
+                id="header-register-btn"
+                onClick={() => setIsUserAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-cyan-500/20"
+                title="Đăng ký tài khoản trader mới"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Đăng Ký</span>
+              </button>
+
+              <button
+                id="header-login-btn"
+                onClick={() => setIsUserAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-cyan-300 hover:text-white text-xs font-semibold transition-all"
+                title="Đăng nhập tài khoản"
+              >
+                <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Đăng Nhập</span>
+              </button>
+            </div>
+          )}
 
           {/* Language Selector */}
           <div className="relative">

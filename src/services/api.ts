@@ -14,14 +14,14 @@ export const api = {
     }
   },
 
-  async getUserProfile(): Promise<{ user: UserProfile; bankDetails: any }> {
+  async getUserProfile(): Promise<{ user: UserProfile; bankDetails: any; vietQrConfig?: any }> {
     try {
       const res = await fetch('/api/user/profile');
       if (!res.ok) throw new Error('Failed to fetch user profile');
       return await res.json();
     } catch (e) {
       const { initialUser, vietQrBankDetails } = await import('./mockData');
-      return { user: initialUser, bankDetails: vietQrBankDetails };
+      return { user: initialUser, bankDetails: vietQrBankDetails, vietQrConfig: vietQrBankDetails };
     }
   },
 
@@ -140,8 +140,33 @@ export const api = {
   },
 
   async getAdminStats(): Promise<any> {
-    const res = await fetch('/api/admin/stats');
-    return await res.json();
+    try {
+      const res = await fetch('/api/admin/stats');
+      if (!res.ok) throw new Error('Failed to fetch admin stats');
+      return await res.json();
+    } catch (e) {
+      console.warn('Fallback local admin stats:', e);
+      return {
+        totalTransactions: 128,
+        successfulTransactions: 124,
+        failedTransactions: 4,
+        totalVolumeVND: 384500000,
+        buyVolumeVND: 290000000,
+        sellVolumeVND: 94500000,
+        totalVolumeUSD: 15125,
+        totalGatewayFeesVND: 3845000,
+        stripeVolumeVND: 120000000,
+        vietQRVolumeVND: 264500000,
+        cryptoBreakdown: [
+          { symbol: 'USDT', volumeVND: 280000000, amount: 10980 },
+          { symbol: 'BTC', volumeVND: 65000000, amount: 0.038 },
+          { symbol: 'ETH', volumeVND: 24500000, amount: 0.35 },
+          { symbol: 'SOL', volumeVND: 15000000, amount: 4.8 }
+        ],
+        spreadSettings: { buyMarkupVND: 850, sellDiscountVND: 850, mode: 'fixed_vnd' },
+        pendingKYC: 2
+      };
+    }
   },
 
   async getKYCSubmissions(filters?: { status?: string; search?: string }): Promise<{ submissions: KYCSubmission[] }> {
@@ -199,33 +224,46 @@ export const api = {
 
   async registerBiometricPasskey(): Promise<boolean> {
     try {
-      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-        // Fetch challenge
-        const challengeRes = await fetch('/api/auth/webauthn/challenge', { method: 'POST' });
-        const data = await challengeRes.json();
-        
-        // Try native WebAuthn if browser supports it
+      if (
+        typeof window !== 'undefined' &&
+        typeof navigator !== 'undefined' &&
+        navigator.credentials &&
+        typeof navigator.credentials.create === 'function' &&
+        typeof window.PublicKeyCredential === 'function'
+      ) {
         try {
-          const cred = await navigator.credentials.create({
-            publicKey: {
-              challenge: Uint8Array.from(atob(data.challenge), c => c.charCodeAt(0)),
-              rp: { name: 'NEXUS Pay Gateway' },
-              user: {
-                id: Uint8Array.from(atob(data.user.id), c => c.charCodeAt(0)),
-                name: data.user.name,
-                displayName: data.user.displayName
-              },
-              pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
-              authenticatorSelection: {
-                authenticatorAttachment: 'platform',
-                userVerification: 'preferred'
-              },
-              timeout: 60000
+          const challengeRes = await fetch('/api/auth/webauthn/challenge', { method: 'POST' });
+          const data = await challengeRes.json();
+          if (data?.challenge && data?.user) {
+            const rawChallenge = atob(data.challenge);
+            const challengeArr = new Uint8Array(rawChallenge.length);
+            for (let i = 0; i < rawChallenge.length; i++) challengeArr[i] = rawChallenge.charCodeAt(i);
+
+            const rawUserId = atob(data.user.id || 'dXNy');
+            const userArr = new Uint8Array(rawUserId.length);
+            for (let i = 0; i < rawUserId.length; i++) userArr[i] = rawUserId.charCodeAt(i);
+
+            const cred = await navigator.credentials.create({
+              publicKey: {
+                challenge: challengeArr,
+                rp: { name: 'NEXUS Pay Gateway' },
+                user: {
+                  id: userArr,
+                  name: data.user.name || 'user',
+                  displayName: data.user.displayName || 'User'
+                },
+                pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+                authenticatorSelection: {
+                  authenticatorAttachment: 'platform',
+                  userVerification: 'preferred'
+                },
+                timeout: 60000
+              }
+            });
+            if (cred) {
+              await fetch('/api/auth/webauthn/verify', { method: 'POST' });
+              return true;
             }
-          });
-          if (cred) {
-            await fetch('/api/auth/webauthn/verify', { method: 'POST' });
-            return true;
           }
         } catch (webauthnErr) {
           console.warn('Native WebAuthn prompt completed/bypassed:', webauthnErr);
@@ -259,13 +297,21 @@ export const api = {
     return await res.json();
   },
 
-  async verifyAdminAuth(payload: { password?: string; pinCode?: string }): Promise<{ success: boolean; authorized: boolean; role?: string; message?: string; error?: string }> {
-    const res = await fetch('/api/admin/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    return await res.json();
+  async verifyAdminAuth(payload: { username?: string; account?: string; email?: string; password?: string; pinCode?: string }): Promise<{ success: boolean; authorized: boolean; role?: string; adminName?: string; message?: string; error?: string }> {
+    try {
+      const res = await fetch('/api/admin/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (err: any) {
+      return {
+        success: false,
+        authorized: false,
+        error: err.message || 'Không thể kết nối đến máy chủ quản trị viên.'
+      };
+    }
   },
 
   async getAdminUsers(filters?: { search?: string; status?: string; tier?: string; role?: string }): Promise<{ users: UserProfile[]; totalCount: number; activeCount: number; lockedCount: number; verifiedCount: number }> {
@@ -325,5 +371,144 @@ export const api = {
       body: JSON.stringify({ userId, currency, amount })
     });
     return await res.json();
+  },
+
+  async registerUser(payload: {
+    fullName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    idCardNumber?: string;
+    passportNumber?: string;
+  }): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
+    const res = await fetch('/api/user/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async loginUser(payload: {
+    emailOrPhone: string;
+    password: string;
+  }): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
+    const res = await fetch('/api/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async logoutUser(): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/user/logout', { method: 'POST' });
+    return await res.json();
+  },
+
+  async getVietQRConfig(): Promise<{ success: boolean; vietQrConfig: any; bankDetails: any }> {
+    try {
+      const res = await fetch('/api/vietqr/config');
+      if (!res.ok) throw new Error('Failed to fetch VietQR config');
+      return await res.json();
+    } catch (e) {
+      const { vietQrBankDetails } = await import('./mockData');
+      return {
+        success: true,
+        vietQrConfig: vietQrBankDetails,
+        bankDetails: vietQrBankDetails
+      };
+    }
+  },
+
+  async updateVietQRConfig(payload: any): Promise<{ success: boolean; vietQrConfig?: any; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/vietqr/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async testVietQRConnection(): Promise<{ success: boolean; status: string; latencyMs?: number; message: string; sampleQrPayload?: string; error?: string }> {
+    const res = await fetch('/api/admin/vietqr/test-connection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await res.json();
+  },
+
+  async adminUpdateTransactionAction(payload: {
+    transactionId: string;
+    action: 'confirm_payment' | 'dispatch_crypto' | 'update_txid' | 'approve_order' | 'reject_order' | 'update_note' | 'confirm_crypto_received' | 'confirm_payout' | 'mark_paid';
+    txHash?: string;
+    adminNote?: string;
+    rejectionReason?: string;
+    receiptImageUrl?: string;
+    operatorName?: string;
+  }): Promise<{ success: boolean; transaction?: Transaction; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/transactions/update-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async getSystemWallets(): Promise<{ success: boolean; wallets: any[] }> {
+    try {
+      const res = await fetch('/api/admin/wallets');
+      if (!res.ok) throw new Error('Failed to fetch wallets');
+      return await res.json();
+    } catch (e) {
+      const { initialSystemWallets } = await import('./mockData');
+      return { success: true, wallets: initialSystemWallets };
+    }
+  },
+
+  async updateSystemWallet(payload: any): Promise<{ success: boolean; wallet?: any; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/wallets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async toggleSystemWalletStatus(walletId: string): Promise<{ success: boolean; wallet?: any; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/wallets/toggle-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletId })
+    });
+    return await res.json();
+  },
+
+  async deleteSystemWallet(walletId: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch(`/api/admin/wallets/${walletId}`, {
+      method: 'DELETE'
+    });
+    return await res.json();
+  },
+
+  async getPaymentPayouts(): Promise<{ success: boolean; payouts: any[] }> {
+    try {
+      const res = await fetch('/api/admin/payouts');
+      if (!res.ok) throw new Error('Failed to fetch payouts');
+      return await res.json();
+    } catch (e) {
+      const { samplePaymentPayouts } = await import('./mockData');
+      return { success: true, payouts: samplePaymentPayouts };
+    }
+  },
+
+  async updatePaymentPayout(payload: any): Promise<{ success: boolean; payout?: any; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/payouts/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
   }
 };
+

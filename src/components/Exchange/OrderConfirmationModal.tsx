@@ -16,7 +16,7 @@ import {
   Building2,
   Wallet
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import confetti from '../../utils/confetti';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 

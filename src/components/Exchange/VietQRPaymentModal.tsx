@@ -11,8 +11,8 @@ import {
   Building2,
   Sparkles
 } from 'lucide-react';
-import QRCode from 'qrcode';
-import confetti from 'canvas-confetti';
+import { QRCode } from '../../utils/qrcode';
+import confetti from '../../utils/confetti';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { vietQrBankDetails } from '../../services/mockData';
@@ -26,8 +26,11 @@ export const VietQRPaymentModal: React.FC = () => {
     setIsOrderConfirmOpen, 
     setActiveOrder,
     addNotification,
-    refreshUser
+    refreshUser,
+    vietQrConfig
   } = useApp();
+
+  const activeBank = vietQrConfig || vietQrBankDetails;
 
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -36,8 +39,8 @@ export const VietQRPaymentModal: React.FC = () => {
 
   useEffect(() => {
     if (activeOrder && isVietQRModalOpen) {
-      // Build VietQR formatted payload string
-      const payload = `24/7_NAPAS_${vietQrBankDetails.bankShort}_${vietQrBankDetails.accountNumber}_${activeOrder.totalVND}_${vietQrBankDetails.gatewayMemoPrefix}_${activeOrder.id}`;
+      // Build VietQR formatted payload string using dynamic admin configuration
+      const payload = `24/7_NAPAS_${activeBank.bankShort || 'VCB'}_${activeBank.accountNumber}_${activeOrder.totalVND}_${activeBank.gatewayMemoPrefix || 'NEXUSPAY'}_${activeOrder.id}`;
       QRCode.toDataURL(payload, {
         width: 260,
         margin: 2,
@@ -49,7 +52,7 @@ export const VietQRPaymentModal: React.FC = () => {
       .then(url => setQrDataUrl(url))
       .catch(err => console.error('QR generation error:', err));
     }
-  }, [activeOrder, isVietQRModalOpen]);
+  }, [activeOrder, isVietQRModalOpen, activeBank]);
 
   // Countdown timer
   useEffect(() => {
@@ -68,7 +71,7 @@ export const VietQRPaymentModal: React.FC = () => {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const memoContent = `${vietQrBankDetails.gatewayMemoPrefix} ${activeOrder.id}`;
+  const memoContent = `${activeBank.gatewayMemoPrefix || 'NEXUSPAY'} ${activeOrder.id}`;
 
   const handleVerifyBankPayment = async () => {
     setIsVerifying(true);
@@ -166,16 +169,16 @@ export const VietQRPaymentModal: React.FC = () => {
           {/* Bank Name */}
           <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl flex items-center justify-between">
             <span className="text-slate-400">{t('bankName')}:</span>
-            <span className="font-semibold text-slate-200 text-right">{vietQrBankDetails.bankName}</span>
+            <span className="font-semibold text-slate-200 text-right">{activeBank.bankName}</span>
           </div>
 
           {/* Account Number */}
           <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl flex items-center justify-between">
             <span className="text-slate-400">{t('accountNumber')}:</span>
             <div className="flex items-center space-x-2">
-              <span className="font-mono font-bold text-white text-sm">{vietQrBankDetails.accountNumber}</span>
+              <span className="font-mono font-bold text-white text-sm">{activeBank.accountNumber}</span>
               <button
-                onClick={() => copyToClipboard(vietQrBankDetails.accountNumber, 'acc')}
+                onClick={() => copyToClipboard(activeBank.accountNumber, 'acc')}
                 className="p-1 text-slate-400 hover:text-white"
               >
                 {copiedField === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -186,7 +189,7 @@ export const VietQRPaymentModal: React.FC = () => {
           {/* Account Name */}
           <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl flex items-center justify-between">
             <span className="text-slate-400">{t('accountName')}:</span>
-            <span className="font-semibold text-slate-200">{vietQrBankDetails.accountName}</span>
+            <span className="font-semibold text-slate-200">{activeBank.accountName}</span>
           </div>
 
           {/* Transfer Memo */}

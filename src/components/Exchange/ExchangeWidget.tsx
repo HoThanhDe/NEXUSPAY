@@ -17,7 +17,12 @@ import {
   TrendingUp,
   TrendingDown,
   Building2,
-  Wallet
+  Wallet,
+  LogIn,
+  LogOut,
+  UserCheck,
+  Lock,
+  User
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CryptoNetwork, PaymentMethod } from '../../types';
@@ -27,6 +32,7 @@ export const ExchangeWidget: React.FC = () => {
   const { 
     t, 
     user, 
+    refreshUser,
     rates, 
     selectedRate, 
     setSelectedRate, 
@@ -35,6 +41,11 @@ export const ExchangeWidget: React.FC = () => {
     setActiveOrder, 
     setIsOrderConfirmOpen,
     setIsKYCModalOpen,
+    isUserLoggedIn,
+    logoutUserAccount,
+    setIsUserAuthModalOpen,
+    setIsAdminUnlocked,
+    setActiveTab,
     addNotification
   } = useApp();
 
@@ -56,8 +67,30 @@ export const ExchangeWidget: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe_card');
   const [lockTimer, setLockTimer] = useState<number>(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isQuickApproving, setIsQuickApproving] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [showP2PComparison, setShowP2PComparison] = useState(false);
+
+  // Quick 1-click Admin KYC Approval for Testing/Demo
+  const handleQuickAdminApprove = async (tier: 'tier1_basic' | 'tier2_advanced') => {
+    setIsQuickApproving(true);
+    try {
+      const res = await api.updateUserTier(user.id, tier);
+      if (res.success) {
+        await refreshUser();
+        addNotification(
+          'kyc_update',
+          'Quản trị viên đã phê duyệt KYC!',
+          `Tài khoản đã được nâng lên ${tier === 'tier2_advanced' ? 'Cấp 2 (Hạn mức 300.000.000 ₫)' : 'Cấp 1 (Hạn mức 10.000.000 ₫)'}. Bạn đã có thể Mua & Bán Crypto ngay lập tức!`
+        );
+        setOrderError(null);
+      }
+    } catch (err: any) {
+      console.error('Quick approve error:', err);
+    } finally {
+      setIsQuickApproving(false);
+    }
+  };
 
   // Rate lock timer
   useEffect(() => {
@@ -107,6 +140,9 @@ export const ExchangeWidget: React.FC = () => {
   }, [activeRateVND, tradeMode]);
 
   // KYC validation
+  const isKycApproved = user.kycStatus === 'verified' || user.kycTier === 'tier1_basic' || user.kycTier === 'tier2_advanced';
+  const isKycPending = user.kycStatus === 'pending';
+  const isKycUnsubmitted = user.kycStatus === 'unsubmitted' || (!isKycApproved && !isKycPending);
   const remainingQuota = Math.max(0, user.monthlyLimitVND - user.monthlyUsedVND);
   const isTier0 = user.kycTier === 'tier0_unverified';
   const isExceedingQuota = (user.monthlyUsedVND + fiatAmountVND) > user.monthlyLimitVND;
@@ -121,9 +157,23 @@ export const ExchangeWidget: React.FC = () => {
   const handleProceed = async () => {
     setOrderError(null);
 
-    if (isTier0) {
-      setOrderError(t('kycRequiredNotice'));
-      setIsKYCModalOpen(true);
+    // STEP 1 & 2: User must be registered & logged in
+    if (!isUserLoggedIn || !user || !user.email) {
+      setOrderError('Bạn cần Đăng ký tài khoản và Đăng nhập trước khi thực hiện Mua hoặc Bán Crypto.');
+      setIsUserAuthModalOpen(true);
+      return;
+    }
+
+    // STEP 3 & 4: User must have KYC approved by Admin
+    if (!isKycApproved || user.monthlyLimitVND <= 0) {
+      setOrderError(
+        isKycPending 
+          ? 'Hồ sơ KYC của bạn đã được gửi và đang chờ Quản trị viên phê duyệt. Sau khi Quản trị viên duyệt, quyền Mua & Bán sẽ tự động kích hoạt!'
+          : 'Quy định pháp lý: Bạn cần nộp CCCD/Hộ chiếu và được Quản trị viên phê duyệt KYC để mở quyền Mua & Bán Crypto.'
+      );
+      if (isKycUnsubmitted) {
+        setIsKYCModalOpen(true);
+      }
       return;
     }
 
@@ -205,6 +255,177 @@ export const ExchangeWidget: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* 5-Step Trading Compliance Workflow (Chỉ hiển thị cho người dùng mới đăng ký/chưa KYC; khi KYC thành công sẽ tự động ẩn đi) */}
+      {!isKycApproved && (
+        <div className="w-full bg-slate-900/95 border border-cyan-500/30 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight flex items-center space-x-2">
+                  <span>Quy Trình 5 Bước Bắt Buộc Để Mua & Bán Crypto</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                    Pháp Lý & An Toàn
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Đăng ký → Đăng nhập → Nộp KYC → Ban Quản Trị duyệt → Mua & Bán tức thì
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Steps Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+            {/* Step 1: Register */}
+            <div className={`p-2.5 rounded-xl border text-xs transition-all ${
+              isUserLoggedIn && user && user.email 
+                ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300' 
+                : 'bg-slate-950/80 border-slate-800 text-slate-300'
+            }`}>
+              <div className="flex items-center justify-between font-bold mb-1 text-[11px]">
+                <span>1. Đăng Ký</span>
+                {isUserLoggedIn && user && user.email ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 line-clamp-1 mb-1.5">
+                {isUserLoggedIn && user && user.email ? user.email : 'Tạo tài khoản mới'}
+              </p>
+              {(!isUserLoggedIn || !user || !user.email) && (
+                <button
+                  onClick={() => setIsUserAuthModalOpen(true)}
+                  className="w-full py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-white rounded-lg text-[10px] font-bold border border-cyan-500/40 transition-colors"
+                >
+                  Đăng Ký Ngay
+                </button>
+              )}
+            </div>
+
+            {/* Step 2: Login */}
+            <div className={`p-2.5 rounded-xl border text-xs transition-all ${
+              isUserLoggedIn && user && user.email 
+                ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300' 
+                : 'bg-slate-950/80 border-slate-800 text-slate-300'
+            }`}>
+              <div className="flex items-center justify-between font-bold mb-1 text-[11px]">
+                <span>2. Đăng Nhập</span>
+                {isUserLoggedIn && user && user.email ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 line-clamp-1 mb-1.5">
+                {isUserLoggedIn && user && user.email ? user.name : 'Đăng nhập trader'}
+              </p>
+              {(!isUserLoggedIn || !user || !user.email) ? (
+                <button
+                  onClick={() => setIsUserAuthModalOpen(true)}
+                  className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[10px] font-bold border border-slate-700 transition-colors"
+                >
+                  Đăng Nhập
+                </button>
+              ) : (
+                <button
+                  onClick={logoutUserAccount}
+                  className="w-full py-0.5 bg-slate-900/80 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 rounded text-[9px] font-medium border border-slate-800 transition-colors"
+                >
+                  Đăng Xuất
+                </button>
+              )}
+            </div>
+
+            {/* Step 3: KYC Submission */}
+            <div className={`p-2.5 rounded-xl border text-xs transition-all ${
+              isKycApproved
+                ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
+                : isKycPending
+                ? 'bg-amber-950/20 border-amber-500/40 text-amber-300'
+                : 'bg-slate-950/80 border-slate-800 text-slate-300'
+            }`}>
+              <div className="flex items-center justify-between font-bold mb-1 text-[11px]">
+                <span>3. Nộp KYC</span>
+                {isKycApproved ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : isKycPending ? (
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 line-clamp-1 mb-1.5">
+                {isKycApproved ? 'Đã nộp CCCD' : isKycPending ? 'Đã gửi hồ sơ' : 'Chưa nộp CCCD'}
+              </p>
+              {isKycUnsubmitted && (
+                <button
+                  onClick={() => setIsKYCModalOpen(true)}
+                  className="w-full py-1 bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white rounded-lg text-[10px] font-bold border border-amber-500/40 transition-colors"
+                >
+                  Nộp KYC Ngay
+                </button>
+              )}
+            </div>
+
+            {/* Step 4: Admin Approval */}
+            <div className={`p-2.5 rounded-xl border text-xs transition-all ${
+              isKycApproved
+                ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
+                : isKycPending
+                ? 'bg-amber-950/20 border-amber-500/40 text-amber-300'
+                : 'bg-slate-950/80 border-slate-800 text-slate-300'
+            }`}>
+              <div className="flex items-center justify-between font-bold mb-1 text-[11px]">
+                <span>4. Ban Quản Trị Duyệt</span>
+                {isKycApproved ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : isKycPending ? (
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 line-clamp-1 mb-1.5">
+                {isKycApproved 
+                  ? (user.kycTier === 'tier2_advanced' ? 'Đã duyệt Cấp 2' : 'Đã duyệt Cấp 1') 
+                  : isKycPending 
+                  ? 'Đang chờ duyệt (1-5p)' 
+                  : 'Chờ xét duyệt'}
+              </p>
+              <div className="text-[9px] text-slate-500 text-center py-0.5">
+                {isKycApproved ? '✓ Đã sẵn sàng' : isKycPending ? 'Đang thẩm định...' : 'Cần nộp CCCD'}
+              </div>
+            </div>
+
+            {/* Step 5: Buy & Sell */}
+            <div className={`p-2.5 rounded-xl border text-xs transition-all ${
+              isKycApproved
+                ? 'bg-emerald-950/30 border-emerald-500 text-emerald-200 shadow-md shadow-emerald-500/10'
+                : 'bg-slate-950/80 border-slate-800 text-slate-500'
+            }`}>
+              <div className="flex items-center justify-between font-bold mb-1 text-[11px]">
+                <span>5. Mua & Bán</span>
+                {isKycApproved ? (
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-rose-400" />
+                )}
+              </div>
+              <p className="text-[10px] line-clamp-1">
+                {isKycApproved ? '🟢 ĐÃ MỞ KHÓA' : '🔒 ĐANG KHÓA'}
+              </p>
+              <p className="text-[9px] text-slate-400 mt-1">
+                {isKycApproved ? 'Giao dịch 24/7' : 'Cần Admin duyệt'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Exchange Card */}
       <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl shadow-slate-950/80 backdrop-blur-xl relative">
         {/* Background ambient glow */}
@@ -271,28 +492,63 @@ export const ExchangeWidget: React.FC = () => {
           </button>
         </div>
 
-        {/* KYC Limit Banner */}
-        {isTier0 ? (
-          <div className="mb-4 p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex items-start space-x-3 text-xs">
-            <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="font-semibold text-amber-200">{t('tier0')}</h4>
-              <p className="text-amber-300/80 mt-0.5">{t('tier0Desc')}</p>
-              <button 
-                id="upgrade-kyc-banner-btn"
-                onClick={() => setIsKYCModalOpen(true)}
-                className="mt-2 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors"
-              >
-                {t('upgradeKyc')} (10M - 300M ₫)
-              </button>
+        {/* KYC Limit Status / Guidance */}
+        {!isKycApproved ? (
+          <div className="mb-4 p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 space-y-2 text-xs">
+            <div className="flex items-start space-x-3">
+              <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <h4 className="font-bold text-amber-200">
+                    {isKycPending ? 'Hồ Sơ KYC Đang Được Ban Quản Trị Thẩm Định' : 'Yêu Cầu Nộp Hồ Sơ KYC Để Mua & Bán Crypto'}
+                  </h4>
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-bold border border-amber-500/40">
+                    {isKycPending ? 'Đang duyệt' : 'Chưa KYC'}
+                  </span>
+                </div>
+                <p className="text-amber-300/80 mt-1 leading-relaxed">
+                  {isKycPending 
+                    ? 'Bạn đã nộp ảnh CCCD/Hộ chiếu. Ban Quản Trị đang kiểm tra hồ sơ và sẽ duyệt trong vòng 1-5 phút.'
+                    : 'Theo quy định an toàn tài chính, bạn cần đăng ký, đăng nhập và nộp hồ sơ CCCD để được cấp hạn mức giao dịch.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Customer Direct Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20">
+              {(!isUserLoggedIn || !user || !user.email) ? (
+                <button 
+                  type="button"
+                  onClick={() => setIsUserAuthModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition-colors flex items-center space-x-1.5 shadow-md"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>1. Đăng Ký / Đăng Nhập Tài Khoản</span>
+                </button>
+              ) : isKycUnsubmitted ? (
+                <button 
+                  type="button"
+                  id="upgrade-kyc-banner-btn"
+                  onClick={() => setIsKYCModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors flex items-center space-x-1.5 shadow-md"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>2. Nộp Hồ Sơ KYC (CCCD/Passport)</span>
+                </button>
+              ) : (
+                <div className="flex items-center space-x-2 text-amber-300 text-[11px] font-medium py-1">
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  <span>Hồ sơ đang chờ duyệt. Bạn có thể liên hệ Hỗ Trợ 24/7 nếu cần hỗ trợ khẩn cấp.</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (
-          <div className="mb-4 p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
+          <div className="mb-4 p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between text-xs">
             <div className="flex items-center space-x-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span className="text-slate-300 font-medium">
-                {user.kycTier === 'tier2_advanced' ? t('tier2') : t('tier1')}
+              <span className="text-emerald-300 font-bold">
+                ✓ Tài khoản đã xác thực: {user.kycTier === 'tier2_advanced' ? 'KYC Cấp 2 (Hạn mức 300M)' : 'KYC Cấp 1 (Hạn mức 10M)'}
               </span>
             </div>
             <div className="text-right">
@@ -591,25 +847,44 @@ export const ExchangeWidget: React.FC = () => {
             </div>
           )}
 
-          {/* Submit Button */}
+          {/* Submit Button with Strict Auth & KYC Flow Status */}
           <button
             id="proceed-payment-submit-btn"
             disabled={isSubmitting || fiatAmountVND <= 0}
             onClick={handleProceed}
             className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-white ${
-              tradeMode === 'buy'
+              !isUserLoggedIn || !user || !user.email
+                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 shadow-cyan-600/30'
+                : !isKycApproved || user.monthlyLimitVND <= 0
+                ? 'bg-gradient-to-r from-amber-700 via-amber-600 to-slate-800 hover:from-amber-600 hover:to-slate-700 shadow-amber-700/20'
+                : tradeMode === 'buy'
                 ? 'bg-gradient-to-r from-cyan-500 via-indigo-600 to-emerald-500 hover:from-cyan-400 hover:via-indigo-500 hover:to-emerald-400 shadow-cyan-600/30'
                 : 'bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-500 hover:from-emerald-400 hover:via-teal-500 hover:to-cyan-400 shadow-emerald-600/30'
             }`}
           >
-            <Zap className="w-5 h-5 text-amber-300 animate-pulse" />
-            <span>
-              {isSubmitting 
-                ? 'Đang khởi tạo đơn hàng...' 
-                : tradeMode === 'buy' 
-                  ? t('proceedToPay') 
-                  : `Xác nhận bán ${cryptoAmount} ${selectedRate.symbol}`}
-            </span>
+            {!isUserLoggedIn || !user || !user.email ? (
+              <>
+                <LogIn className="w-5 h-5 text-amber-300" />
+                <span>1. Đăng Ký & Đăng Nhập Để Mua/Bán Crypto</span>
+                <ArrowRight className="w-5 h-5 text-amber-300" />
+              </>
+            ) : !isKycApproved || user.monthlyLimitVND <= 0 ? (
+              <>
+                <Lock className="w-5 h-5 text-amber-300" />
+                <span>🔒 Cần Quản Trị Viên Phê Duyệt KYC Mới Mua & Bán Được</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-5 h-5 text-amber-300 animate-pulse" />
+                <span>
+                  {isSubmitting 
+                    ? 'Đang khởi tạo đơn hàng...' 
+                    : tradeMode === 'buy' 
+                      ? t('proceedToPay') 
+                      : `Xác nhận bán ${cryptoAmount} ${selectedRate.symbol}`}
+                </span>
+              </>
+            )}
           </button>
         </div>
       </div>

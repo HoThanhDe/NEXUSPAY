@@ -107,10 +107,17 @@ export type TransactionStatus =
   | 'failed'
   | 'refunded';
 
+export type PaymentStatus = 'pending_payment' | 'paid' | 'expired';
+export type ProcessingStatus = 'pending_review' | 'processing' | 'crypto_dispatched' | 'completed' | 'rejected';
+export type CryptoReceiveStatus = 'pending_crypto' | 'crypto_received';
+
 export interface Transaction {
   id: string;
   userId: string;
   userEmail: string;
+  userName?: string;
+  fullName?: string;
+  phone?: string;
   type: 'buy_crypto' | 'sell_crypto' | 'fiat_checkout';
   fiatAmount: number;
   fiatCurrency: FiatSymbol;
@@ -118,18 +125,30 @@ export interface Transaction {
   cryptoSymbol: CryptoSymbol;
   network: CryptoNetwork;
   recipientWallet?: string;
-  depositWallet?: string; // For sell crypto
+  depositWallet?: string; // For sell crypto (system wallet)
+  clientTxHash?: string; // TXID sent by customer when selling crypto
   bankPayout?: {
     bankName: string;
     accountNumber: string;
     accountName: string;
+    payoutMemo?: string;
+    receiptImageUrl?: string;
+    payoutTime?: string;
+    operatorName?: string;
   };
   paymentMethod: PaymentMethod;
+  paymentCode?: string;
+  transferMemo?: string;
+  paymentStatus?: PaymentStatus;
+  processingStatus?: ProcessingStatus;
+  cryptoReceiveStatus?: CryptoReceiveStatus;
+  adminNote?: string;
   status: TransactionStatus;
   stripePaymentIntentId?: string;
   txHash?: string;
   p2pBenchmarkRate?: number;
   p2pSpreadDelta?: number;
+  exchangeRate?: number;
   blockConfirmations: number;
   requiredConfirmations: number;
   networkFeeVND: number;
@@ -140,6 +159,38 @@ export interface Transaction {
   emailSent: boolean;
   receiptNumber: string;
   kycTierAtTransaction: KYCTier;
+}
+
+export interface SystemWallet {
+  id: string;
+  coin: CryptoSymbol;
+  network: CryptoNetwork;
+  address: string;
+  qrCodeUrl?: string;
+  status: 'active' | 'suspended';
+  label?: string;
+  receivedCount?: number;
+  balance?: number;
+  updatedAt: string;
+}
+
+export interface PaymentPayoutRecord {
+  id: string;
+  transactionId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  bankName: string;
+  bankShort?: string;
+  accountNumber: string;
+  accountName: string;
+  amountVND: number;
+  transferMemo: string;
+  receiptImageUrl?: string;
+  transferTime?: string;
+  operatorName?: string;
+  status: 'pending_payment' | 'paid' | 'failed';
+  adminNote?: string;
 }
 
 export interface KYCSubmission {
@@ -235,4 +286,28 @@ export interface SupportChatMessage {
   text: string;
   timestamp: string;
   suggestedActions?: string[];
+}
+
+export interface VietQRConfig {
+  bankName: string;
+  bankShort: string;
+  bankCode: string;
+  accountNumber: string;
+  accountName: string;
+  gatewayMemoPrefix: string;
+  partnerApiKey?: string;
+  partnerApiSecret?: string;
+  webhookUrl?: string;
+  autoConfirmDeposit?: boolean;
+  testMode?: boolean;
+  bankLogoUrl?: string;
+  lastUpdated?: string;
+}
+
+export interface UserAuthResponse {
+  success: boolean;
+  user?: UserProfile;
+  message?: string;
+  error?: string;
+  token?: string;
 }

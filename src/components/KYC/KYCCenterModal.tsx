@@ -17,7 +17,7 @@ import {
   SwitchCamera,
   Eye
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import confetti from '../../utils/confetti';
 import { useApp } from '../../context/AppContext';
 import { KYCTier } from '../../types';
 import { api } from '../../services/api';
@@ -96,7 +96,7 @@ export const KYCCenterModal: React.FC = () => {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước ảnh không được vượt quá 10MB.');
+      addNotification('security_alert', 'Ảnh quá lớn', 'Kích thước ảnh không được vượt quá 10MB.');
       return;
     }
 
@@ -213,11 +213,11 @@ export const KYCCenterModal: React.FC = () => {
   const handleSubmitKYC = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!frontImage) {
-      alert('Vui lòng tải lên hoặc chụp ảnh CCCD / Hộ chiếu mặt trước.');
+      addNotification('security_alert', 'Thiếu ảnh giấy tờ', 'Vui lòng tải lên hoặc chụp ảnh CCCD / Hộ chiếu mặt trước.');
       return;
     }
     if (selectedTargetTier === 'tier1_basic' && !backImage) {
-      alert('Vui lòng tải lên hoặc chụp ảnh CCCD mặt sau.');
+      addNotification('security_alert', 'Thiếu ảnh giấy tờ', 'Vui lòng tải lên hoặc chụp ảnh CCCD mặt sau.');
       return;
     }
 
@@ -255,7 +255,7 @@ export const KYCCenterModal: React.FC = () => {
       }
     } catch (err: any) {
       console.error('KYC submit error:', err);
-      alert('Lỗi nộp hồ sơ: ' + (err.message || 'Không thể kết nối máy chủ'));
+      addNotification('security_alert', 'Lỗi nộp hồ sơ', err.message || 'Không thể kết nối máy chủ');
     } finally {
       setIsSubmitting(false);
     }

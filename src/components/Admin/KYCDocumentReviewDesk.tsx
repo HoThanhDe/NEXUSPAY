@@ -134,7 +134,7 @@ export const KYCDocumentReviewDesk: React.FC<KYCDocumentReviewDeskProps> = ({ on
         await loadSubmissions();
       }
     } catch (e: any) {
-      alert('Lỗi phê duyệt: ' + e.message);
+      addNotification('security_alert', 'Lỗi phê duyệt', e.message || 'Không thể phê duyệt hồ sơ.');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -166,7 +166,7 @@ export const KYCDocumentReviewDesk: React.FC<KYCDocumentReviewDeskProps> = ({ on
         await loadSubmissions();
       }
     } catch (e: any) {
-      alert('Lỗi từ chối: ' + e.message);
+      addNotification('security_alert', 'Lỗi từ chối', e.message || 'Không thể từ chối hồ sơ.');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -258,12 +258,40 @@ export const KYCDocumentReviewDesk: React.FC<KYCDocumentReviewDeskProps> = ({ on
         <div className="lg:col-span-4 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col h-[740px]">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
             <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Danh Sách Hồ Sơ ({submissions.length})</span>
-            <button
-              onClick={loadSubmissions}
-              className="text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>Làm mới</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.submitKYC({
+                      targetTier: 'tier2_advanced',
+                      fullName: 'VŨ ĐỨC MINH',
+                      dob: '1995-10-18',
+                      idCardNumber: '079095009988',
+                      address: '189 Nguyễn Thị Minh Khai, Phường Phạm Ngũ Lão, Quận 1, TP.HCM',
+                      idCardFrontUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80',
+                      idCardBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=80',
+                      portraitUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
+                      biometricLivenessPassed: true
+                    });
+                    addNotification('kyc_update', 'Đã tạo hồ sơ KYC mẫu', 'Hồ sơ KYC mẫu của khách hàng Vũ Đức Minh đã được thêm vào hàng chờ xét duyệt.');
+                    await loadSubmissions();
+                  } catch (e: any) {
+                    addNotification('security_alert', 'Lỗi tạo hồ sơ mẫu', e.message || 'Không thể tạo hồ sơ mẫu.');
+                  }
+                }}
+                className="text-[11px] px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-medium transition-colors"
+                title="Tạo nhanh 1 hồ sơ mẫu đang chờ duyệt để thẩm định"
+              >
+                + Tạo Mẫu Chờ Duyệt
+              </button>
+              <button
+                onClick={loadSubmissions}
+                className="text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium flex items-center space-x-1"
+              >
+                <span>Làm mới</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">

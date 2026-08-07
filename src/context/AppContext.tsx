@@ -15,10 +15,21 @@ interface AppContextType {
   setSelectedRate: (rate: CryptoRate) => void;
   activeTab: 'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin';
   setActiveTab: (tab: 'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin') => void;
+  currentPortal: 'user' | 'admin';
+  setCurrentPortal: (portal: 'user' | 'admin') => void;
   isAdminUnlocked: boolean;
   setIsAdminUnlocked: (unlocked: boolean) => void;
+  lockAdminSession: () => void;
   isAdminAuthModalOpen: boolean;
   setIsAdminAuthModalOpen: (open: boolean) => void;
+  isUserAuthModalOpen: boolean;
+  setIsUserAuthModalOpen: (open: boolean) => void;
+  isUserLoggedIn: boolean;
+  loginUserAccount: (emailOrPhone: string, pass: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  registerUserAccount: (payload: any) => Promise<{ success: boolean; error?: string; message?: string }>;
+  logoutUserAccount: () => Promise<void>;
+  vietQrConfig: any;
+  refreshVietQrConfig: () => Promise<void>;
   notifications: InAppNotification[];
   unreadCount: number;
   markNotificationsAsRead: () => void;
@@ -48,8 +59,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [rates, setRates] = useState<CryptoRate[]>(initialCryptoRates);
   const [selectedRate, setSelectedRate] = useState<CryptoRate>(initialCryptoRates[0]);
   const [activeTab, setActiveTab] = useState<'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin'>('exchange');
+  const [currentPortal, setCurrentPortal] = useState<'user' | 'admin'>('user');
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
+  const [isUserAuthModalOpen, setIsUserAuthModalOpen] = useState<boolean>(false);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
+  const [vietQrConfig, setVietQrConfig] = useState<any>(null);
 
   // Modals state
   const [activeOrder, setActiveOrder] = useState<Transaction | null>(null);
@@ -90,8 +105,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data?.user) {
         setUser(data.user);
       }
+      if (data?.vietQrConfig) {
+        setVietQrConfig(data.vietQrConfig);
+      }
     } catch (e) {
       console.warn('Failed to refresh user:', e);
+    }
+  };
+
+  const refreshVietQrConfig = async () => {
+    try {
+      const data = await api.getVietQRConfig();
+      if (data?.vietQrConfig) {
+        setVietQrConfig(data.vietQrConfig);
+      }
+    } catch (e) {
+      console.warn('Failed to refresh VietQR config:', e);
+    }
+  };
+
+  const loginUserAccount = async (emailOrPhone: string, pass: string) => {
+    try {
+      const res = await api.loginUser({ emailOrPhone, password: pass });
+      if (res.success && res.user) {
+        setUser(res.user);
+        setIsUserLoggedIn(true);
+        setIsUserAuthModalOpen(false);
+        addNotification('security_alert', 'Đăng nhập thành công', `Chào mừng ${res.user.name} trở lại sàn giao dịch.`);
+        return { success: true, message: res.message };
+      }
+      return { success: false, error: res.error || 'Đăng nhập không thành công.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Lỗi kết nối máy chủ.' };
+    }
+  };
+
+  const registerUserAccount = async (payload: any) => {
+    try {
+      const res = await api.registerUser(payload);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setIsUserLoggedIn(true);
+        setIsUserAuthModalOpen(false);
+        addNotification('kyc_update', 'Tạo tài khoản thành công', `Chào mừng ${res.user.name}! Bạn có thể nộp CCCD/Passport để mở hạn mức.`);
+        return { success: true, message: res.message };
+      }
+      return { success: false, error: res.error || 'Đăng ký không thành công.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Lỗi kết nối máy chủ.' };
+    }
+  };
+
+  const logoutUserAccount = async () => {
+    try {
+      await api.logoutUser();
+      setIsUserLoggedIn(false);
+      setUser(initialUser);
+      setIsAdminUnlocked(false);
+      setActiveTab('exchange');
+      addNotification('security_alert', 'Đăng xuất thành công', 'Bạn đã đăng xuất tài khoản an toàn.');
+    } catch (e) {
+      setIsUserLoggedIn(false);
+      setUser(initialUser);
     }
   };
 
@@ -109,6 +184,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     refreshUser();
+    refreshVietQrConfig();
     fetchRates();
     const interval = setInterval(fetchRates, 5000);
     return () => clearInterval(interval);
@@ -146,6 +222,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const lockAdminSession = () => {
+    setIsAdminUnlocked(false);
+    setActiveTab('exchange');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -159,10 +240,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedRate,
         activeTab,
         setActiveTab,
+        currentPortal,
+        setCurrentPortal,
         isAdminUnlocked,
         setIsAdminUnlocked,
+        lockAdminSession,
         isAdminAuthModalOpen,
         setIsAdminAuthModalOpen,
+        isUserAuthModalOpen,
+        setIsUserAuthModalOpen,
+        isUserLoggedIn,
+        loginUserAccount,
+        registerUserAccount,
+        logoutUserAccount,
+        vietQrConfig,
+        refreshVietQrConfig,
         notifications,
         unreadCount,
         markNotificationsAsRead,
