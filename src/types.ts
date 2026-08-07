@@ -7,6 +7,8 @@ export interface UserProfile {
   name: string;
   email: string;
   phone?: string;
+  role?: 'user' | 'admin';
+  status?: 'active' | 'suspended' | 'locked';
   kycTier: KYCTier;
   kycStatus: 'unsubmitted' | 'pending' | 'verified' | 'rejected';
   monthlyLimitVND: number;
@@ -27,6 +29,14 @@ export interface UserProfile {
   twoFactorEnabled: boolean;
   biometricsEnabled: boolean;
   registeredAt: string;
+  idCardFrontUrl?: string;
+  idCardBackUrl?: string;
+  portraitUrl?: string;
+  idCardNumber?: string;
+  passportNumber?: string;
+  dateOfBirth?: string;
+  address?: string;
+  lastLogin?: string;
 }
 
 export type CryptoSymbol = 'USDT' | 'BTC' | 'ETH' | 'SOL';
@@ -164,6 +174,7 @@ export interface KYCSubmission {
   idCardBackUrl?: string;
   frontIdUrl?: string;
   backIdUrl?: string;
+  portraitUrl?: string;
   portraitPhotoUrl?: string;
   proofOfAddressUrl?: string;
   documentPhotos?: string[];

@@ -14,7 +14,8 @@ import {
   LayoutDashboard,
   Headphones,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Language } from '../types';
@@ -28,6 +29,8 @@ export const Header: React.FC = () => {
     rates, 
     activeTab, 
     setActiveTab, 
+    isAdminUnlocked,
+    setIsAdminAuthModalOpen,
     notifications, 
     unreadCount, 
     markNotificationsAsRead,
@@ -150,6 +153,20 @@ export const Header: React.FC = () => {
             <span>{t('history')}</span>
           </button>
 
+          {/* User Profile View Shortcut */}
+          <button
+            id="nav-profile-btn"
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === 'profile'
+                ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Tài Khoản & KYC</span>
+          </button>
+
           <button
             id="nav-kyc-btn"
             onClick={() => setIsKYCModalOpen(true)}
@@ -170,15 +187,21 @@ export const Header: React.FC = () => {
 
           <button
             id="nav-admin-btn"
-            onClick={() => setActiveTab('admin')}
+            onClick={() => {
+              if (isAdminUnlocked) {
+                setActiveTab('admin');
+              } else {
+                setIsAdminAuthModalOpen(true);
+              }
+            }}
             className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'admin'
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-emerald-400/90 hover:text-emerald-300 hover:bg-emerald-950/40'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30'
+                : 'text-purple-300 hover:text-purple-200 hover:bg-purple-950/40'
             }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>{t('admin')}</span>
+            <LayoutDashboard className="w-3.5 h-3.5 text-purple-400" />
+            <span>{t('admin')} {isAdminUnlocked ? '' : '🔒'}</span>
           </button>
         </nav>
 

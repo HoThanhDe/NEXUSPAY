@@ -13,8 +13,12 @@ interface AppContextType {
   rates: CryptoRate[];
   selectedRate: CryptoRate;
   setSelectedRate: (rate: CryptoRate) => void;
-  activeTab: 'exchange' | 'market' | 'history' | 'kyc' | 'security' | 'admin';
-  setActiveTab: (tab: 'exchange' | 'market' | 'history' | 'kyc' | 'security' | 'admin') => void;
+  activeTab: 'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin';
+  setActiveTab: (tab: 'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin') => void;
+  isAdminUnlocked: boolean;
+  setIsAdminUnlocked: (unlocked: boolean) => void;
+  isAdminAuthModalOpen: boolean;
+  setIsAdminAuthModalOpen: (open: boolean) => void;
   notifications: InAppNotification[];
   unreadCount: number;
   markNotificationsAsRead: () => void;
@@ -43,7 +47,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<UserProfile>(initialUser);
   const [rates, setRates] = useState<CryptoRate[]>(initialCryptoRates);
   const [selectedRate, setSelectedRate] = useState<CryptoRate>(initialCryptoRates[0]);
-  const [activeTab, setActiveTab] = useState<'exchange' | 'market' | 'history' | 'kyc' | 'security' | 'admin'>('exchange');
+  const [activeTab, setActiveTab] = useState<'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin'>('exchange');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
 
   // Modals state
   const [activeOrder, setActiveOrder] = useState<Transaction | null>(null);
@@ -153,6 +159,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedRate,
         activeTab,
         setActiveTab,
+        isAdminUnlocked,
+        setIsAdminUnlocked,
+        isAdminAuthModalOpen,
+        setIsAdminAuthModalOpen,
         notifications,
         unreadCount,
         markNotificationsAsRead,

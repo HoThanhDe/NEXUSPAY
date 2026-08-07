@@ -15,6 +15,8 @@ import { TransactionHistory } from './components/History/TransactionHistory';
 import { KYCCenterModal } from './components/KYC/KYCCenterModal';
 import { SecuritySettingsModal } from './components/Security/SecuritySettingsModal';
 import { AdminDashboard } from './components/Admin/AdminDashboard';
+import { AdminAuthModal } from './components/Admin/AdminAuthModal';
+import { UserProfileView } from './components/User/UserProfileView';
 import { SupportChatModal } from './components/Support/SupportChatModal';
 import { 
   ShieldCheck, 
@@ -103,6 +105,12 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'profile' && (
+          <div className="animate-fade-in">
+            <UserProfileView />
+          </div>
+        )}
+
         {activeTab === 'admin' && (
           <div className="animate-fade-in">
             <AdminDashboard />
@@ -117,6 +125,7 @@ const MainContent: React.FC = () => {
       <KYCCenterModal />
       <SecuritySettingsModal />
       <SupportChatModal />
+      <AdminAuthModal />
 
       {/* Floating 24/7 AI Support Trigger */}
       <button

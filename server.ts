@@ -16,7 +16,110 @@ import { Transaction, KYCSubmission, UserProfile, CryptoRate, P2PSpreadSettings 
 
 // In-Memory Durable Store for full runtime persistence
 let transactions: Transaction[] = [...sampleTransactions];
-let userProfile: UserProfile = { ...initialUser };
+let userProfile: UserProfile = { 
+  ...initialUser, 
+  role: 'user',
+  status: 'active',
+  idCardNumber: '079094012345',
+  passportNumber: 'B8291039',
+  dateOfBirth: '1994-08-15',
+  address: '123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+  idCardFrontUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
+  idCardBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
+  portraitUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80'
+};
+
+// Users database managed by Admin
+let usersDatabase: UserProfile[] = [
+  {
+    ...userProfile
+  },
+  {
+    id: 'USR-89215',
+    name: 'Trần Thị Mai',
+    email: 'mai.tran@gmail.com',
+    phone: '0912345678',
+    role: 'user',
+    status: 'active',
+    kycTier: 'tier2_advanced',
+    kycStatus: 'verified',
+    monthlyLimitVND: 300000000,
+    monthlyUsedVND: 45000000,
+    walletBalance: { VND: 12500000, USDT: 1450.5, BTC: 0.05, ETH: 0.8, SOL: 12.4 },
+    twoFactorEnabled: true,
+    biometricsEnabled: true,
+    registeredAt: '2026-06-10T10:15:00Z',
+    idCardNumber: '079198009876',
+    passportNumber: 'C1928472',
+    dateOfBirth: '1998-03-22',
+    address: '456 Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
+    idCardFrontUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80',
+    idCardBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
+    portraitUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80',
+    lastLogin: '2026-08-06T19:40:00Z'
+  },
+  {
+    id: 'USR-89216',
+    name: 'Lê Hoàng Nam',
+    email: 'nam.lehoang@yahoo.com',
+    phone: '0988765432',
+    role: 'user',
+    status: 'active',
+    kycTier: 'tier1_basic',
+    kycStatus: 'verified',
+    monthlyLimitVND: 10000000,
+    monthlyUsedVND: 8200000,
+    walletBalance: { VND: 3400000, USDT: 220.0, BTC: 0, ETH: 0, SOL: 2.1 },
+    twoFactorEnabled: false,
+    biometricsEnabled: false,
+    registeredAt: '2026-07-02T14:30:00Z',
+    idCardNumber: '001095001234',
+    dateOfBirth: '1995-11-08',
+    address: '78 Phố Huế, Quận Hai Bà Trưng, Hà Nội',
+    idCardFrontUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80',
+    idCardBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
+    lastLogin: '2026-08-05T08:15:00Z'
+  },
+  {
+    id: 'USR-89217',
+    name: 'Phạm Đức Minh',
+    email: 'minh.crypto@outlook.com',
+    phone: '0903334445',
+    role: 'user',
+    status: 'locked',
+    kycTier: 'tier0_unverified',
+    kycStatus: 'rejected',
+    monthlyLimitVND: 0,
+    monthlyUsedVND: 0,
+    walletBalance: { VND: 0, USDT: 0, BTC: 0, ETH: 0, SOL: 0 },
+    twoFactorEnabled: false,
+    biometricsEnabled: false,
+    registeredAt: '2026-08-01T09:00:00Z',
+    idCardNumber: '038099008899',
+    dateOfBirth: '1999-05-14',
+    address: '12 Trần Phú, Quận Hải Châu, TP. Đà Nẵng',
+    lastLogin: '2026-08-04T12:00:00Z'
+  },
+  {
+    id: 'ADM-00001',
+    name: 'NEXUS Super Admin',
+    email: 'admin@nexuspay.gateway',
+    phone: '0909999999',
+    role: 'admin',
+    status: 'active',
+    kycTier: 'tier2_advanced',
+    kycStatus: 'verified',
+    monthlyLimitVND: 5000000000,
+    monthlyUsedVND: 0,
+    walletBalance: { VND: 500000000, USDT: 50000, BTC: 5, ETH: 50, SOL: 500 },
+    twoFactorEnabled: true,
+    biometricsEnabled: true,
+    registeredAt: '2026-01-01T00:00:00Z',
+    lastLogin: '2026-08-06T22:00:00Z'
+  }
+];
+
+let userPasswordHash = 'pass123456'; // Default mock password
 let kycSubmissions: KYCSubmission[] = [...sampleKycQueue];
 let p2pSpreadSettings: P2PSpreadSettings = { ...defaultP2PSpreadSettings };
 let liveCryptoRates: CryptoRate[] = [...initialCryptoRates];
@@ -242,6 +345,201 @@ async function startServer() {
       bankDetails: vietQrBankDetails,
       depositHotWallets
     });
+  });
+
+  // User Change Password Endpoint
+  app.post('/api/user/change-password', (req: Request, res: Response) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+      }
+
+      // Check current password if provided
+      if (currentPassword && currentPassword !== userPasswordHash && userPasswordHash !== 'pass123456') {
+        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+      }
+
+      userPasswordHash = newPassword;
+      userProfile.lastLogin = new Date().toISOString();
+      const userInDb = usersDatabase.find(u => u.id === userProfile.id);
+      if (userInDb) {
+        userInDb.lastLogin = userProfile.lastLogin;
+      }
+
+      res.json({
+        success: true,
+        message: 'Mật khẩu tài khoản đã được đổi thành công! Vui lòng lưu trữ mật khẩu an toàn.'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Master Authentication Guard
+  app.post('/api/admin/auth/verify', (req: Request, res: Response) => {
+    try {
+      const { password, pinCode } = req.body;
+      const validPasswords = ['nexus2026', 'admin123', 'admin@nexus', '123456'];
+      const validPins = ['8888', '1234', '2026'];
+
+      if (validPasswords.includes(password) || validPins.includes(pinCode)) {
+        res.json({
+          success: true,
+          authorized: true,
+          role: 'admin',
+          message: 'Xác thực Quản trị viên thành công! Toàn bộ quyền truy cập dữ liệu quan trọng đã được mở khóa.'
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          authorized: false,
+          error: 'Mật khẩu hoặc mã PIN Quản trị viên không chính xác.'
+        });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Get All Users List
+  app.get('/api/admin/users', (req: Request, res: Response) => {
+    const { search, status, tier, role } = req.query;
+    let list = [...usersDatabase];
+
+    if (role && role !== 'all') {
+      list = list.filter(u => u.role === role);
+    }
+    if (status && status !== 'all') {
+      list = list.filter(u => u.status === status);
+    }
+    if (tier && tier !== 'all') {
+      list = list.filter(u => u.kycTier === tier);
+    }
+    if (search) {
+      const q = String(search).toLowerCase();
+      list = list.filter(u => 
+        u.id.toLowerCase().includes(q) ||
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.phone && u.phone.includes(q)) ||
+        (u.idCardNumber && u.idCardNumber.includes(q))
+      );
+    }
+
+    res.json({
+      users: list,
+      totalCount: list.length,
+      activeCount: list.filter(u => u.status === 'active').length,
+      lockedCount: list.filter(u => u.status === 'locked').length,
+      verifiedCount: list.filter(u => u.kycStatus === 'verified').length
+    });
+  });
+
+  // Admin Lock / Unlock User Account
+  app.post('/api/admin/users/update-status', (req: Request, res: Response) => {
+    try {
+      const { userId, status } = req.body;
+      const targetUser = usersDatabase.find(u => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      }
+
+      targetUser.status = status;
+      if (targetUser.id === userProfile.id) {
+        userProfile.status = status;
+      }
+
+      res.json({
+        success: true,
+        user: targetUser,
+        message: `Đã cập nhật trạng thái tài khoản ${targetUser.name} (${targetUser.email}) thành: ${status === 'active' ? 'Đang hoạt động' : 'Đã bị khóa'}!`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Change KYC Tier Directly
+  app.post('/api/admin/users/update-tier', (req: Request, res: Response) => {
+    try {
+      const { userId, tier } = req.body;
+      const targetUser = usersDatabase.find(u => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      }
+
+      targetUser.kycTier = tier;
+      targetUser.kycStatus = tier === 'tier0_unverified' ? 'unsubmitted' : 'verified';
+      targetUser.monthlyLimitVND = tier === 'tier2_advanced' ? 300000000 : tier === 'tier1_basic' ? 10000000 : 0;
+
+      if (targetUser.id === userProfile.id) {
+        userProfile.kycTier = targetUser.kycTier;
+        userProfile.kycStatus = targetUser.kycStatus;
+        userProfile.monthlyLimitVND = targetUser.monthlyLimitVND;
+      }
+
+      res.json({
+        success: true,
+        user: targetUser,
+        message: `Đã cấp hạn mức KYC cho ${targetUser.name}: ${targetUser.monthlyLimitVND.toLocaleString('vi-VN')} ₫/tháng!`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Reset User Password
+  app.post('/api/admin/users/reset-password', (req: Request, res: Response) => {
+    try {
+      const { userId, tempPassword = 'nexusTempPass123' } = req.body;
+      const targetUser = usersDatabase.find(u => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      }
+
+      if (targetUser.id === userProfile.id) {
+        userPasswordHash = tempPassword;
+      }
+
+      res.json({
+        success: true,
+        tempPassword,
+        message: `Đã đặt lại mật khẩu tạm thời cho ${targetUser.email}: "${tempPassword}". Người dùng có thể đăng nhập và đổi lại mật khẩu.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Adjust Wallet Balance
+  app.post('/api/admin/users/adjust-balance', (req: Request, res: Response) => {
+    try {
+      const { userId, currency, amount } = req.body;
+      const targetUser = usersDatabase.find(u => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      }
+
+      const numAmount = Number(amount);
+      if (currency === 'VND') {
+        targetUser.walletBalance.VND = Math.max(0, targetUser.walletBalance.VND + numAmount);
+      } else if (currency in targetUser.walletBalance) {
+        (targetUser.walletBalance as any)[currency] = Math.max(0, Number(((targetUser.walletBalance as any)[currency] + numAmount).toFixed(6)));
+      }
+
+      if (targetUser.id === userProfile.id) {
+        userProfile.walletBalance = { ...targetUser.walletBalance };
+      }
+
+      res.json({
+        success: true,
+        user: targetUser,
+        message: `Đã điều chỉnh số dư ${currency} cho ${targetUser.name} (+${numAmount.toLocaleString('vi-VN')} ${currency})!`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // 4. Create Crypto Purchase or Sale Order with KYC Guard & P2P Spread Delta
@@ -550,6 +848,7 @@ async function startServer() {
         address,
         idCardFrontUrl,
         idCardBackUrl,
+        portraitUrl,
         proofOfAddressUrl,
         biometricLivenessPassed
       } = req.body;
@@ -564,13 +863,14 @@ async function startServer() {
         targetTier: targetTier || 'tier1_basic',
         status: 'pending',
         submittedAt: new Date().toISOString(),
-        fullName,
-        dateOfBirth: dob,
-        idCardNumber,
-        passportNumber,
-        address,
-        idCardFrontUrl,
-        idCardBackUrl,
+        fullName: fullName || userProfile.name,
+        dateOfBirth: dob || userProfile.dateOfBirth,
+        idCardNumber: idCardNumber || userProfile.idCardNumber,
+        passportNumber: passportNumber || userProfile.passportNumber,
+        address: address || userProfile.address,
+        idCardFrontUrl: idCardFrontUrl || userProfile.idCardFrontUrl,
+        idCardBackUrl: idCardBackUrl || userProfile.idCardBackUrl,
+        portraitUrl: portraitUrl || userProfile.portraitUrl,
         proofOfAddressUrl,
         biometricLivenessPassed: Boolean(biometricLivenessPassed),
         biometricScore: biometricLivenessPassed ? 98.6 : 0
@@ -578,11 +878,26 @@ async function startServer() {
 
       kycSubmissions.unshift(newSubmission);
       userProfile.kycStatus = 'pending';
+      if (fullName) userProfile.name = fullName;
+      if (dob) userProfile.dateOfBirth = dob;
+      if (idCardNumber) userProfile.idCardNumber = idCardNumber;
+      if (passportNumber) userProfile.passportNumber = passportNumber;
+      if (address) userProfile.address = address;
+      if (idCardFrontUrl) userProfile.idCardFrontUrl = idCardFrontUrl;
+      if (idCardBackUrl) userProfile.idCardBackUrl = idCardBackUrl;
+      if (portraitUrl) userProfile.portraitUrl = portraitUrl;
+
+      // Sync into usersDatabase
+      const uIndex = usersDatabase.findIndex(u => u.id === userProfile.id);
+      if (uIndex !== -1) {
+        usersDatabase[uIndex] = { ...userProfile };
+      }
 
       res.json({
         success: true,
         submission: newSubmission,
-        message: 'Đơn xác minh KYC đã được ghi nhận thành công và đang chờ xét duyệt.'
+        userProfile,
+        message: 'Đơn xác minh KYC kèm ảnh chụp giấy tờ đã được ghi nhận thành công và đang chờ xét duyệt!'
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

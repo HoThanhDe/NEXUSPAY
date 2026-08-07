@@ -40,12 +40,14 @@ import { api } from '../../services/api';
 import { Transaction } from '../../types';
 import { KYCDocumentReviewDesk } from './KYCDocumentReviewDesk';
 import { PriceManagementDesk } from './PriceManagementDesk';
+import { AdminUsersManagementDesk } from './AdminUsersManagementDesk';
+import { Users } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { t, refreshUser, addNotification } = useApp();
   
   // Admin Navigation Active Tab
-  const [adminTab, setAdminTab] = useState<'kyc_review' | 'price_management' | 'revenue_reports'>('kyc_review');
+  const [adminTab, setAdminTab] = useState<'admin_users' | 'kyc_review' | 'price_management' | 'revenue_reports'>('admin_users');
 
   const [stats, setStats] = useState<any>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -151,8 +153,21 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 3 Core Admin Tabs */}
+        {/* 4 Core Admin Tabs */}
         <div className="flex flex-wrap items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-semibold gap-1">
+          <button
+            id="admin-tab-users-btn"
+            onClick={() => setAdminTab('admin_users')}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 ${
+              adminTab === 'admin_users'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-lg shadow-purple-600/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Quản Lý Người Dùng</span>
+          </button>
+
           <button
             id="admin-tab-kyc-btn"
             onClick={() => setAdminTab('kyc_review')}
@@ -202,6 +217,10 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Render Active Workspace Tab */}
+      {adminTab === 'admin_users' && (
+        <AdminUsersManagementDesk />
+      )}
+
       {adminTab === 'kyc_review' && (
         <KYCDocumentReviewDesk onRefreshStats={loadData} />
       )}

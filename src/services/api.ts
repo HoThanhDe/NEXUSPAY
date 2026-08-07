@@ -248,5 +248,82 @@ export const api = {
       body: JSON.stringify({ code })
     });
     return await res.json();
+  },
+
+  async changePassword(payload: { currentPassword?: string; newPassword: string }): Promise<{ success: boolean; message: string; error?: string }> {
+    const res = await fetch('/api/user/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async verifyAdminAuth(payload: { password?: string; pinCode?: string }): Promise<{ success: boolean; authorized: boolean; role?: string; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async getAdminUsers(filters?: { search?: string; status?: string; tier?: string; role?: string }): Promise<{ users: UserProfile[]; totalCount: number; activeCount: number; lockedCount: number; verifiedCount: number }> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.tier) params.append('tier', filters.tier);
+      if (filters?.role) params.append('role', filters.role);
+
+      const res = await fetch(`/api/admin/users?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch admin users');
+      return await res.json();
+    } catch (e) {
+      const { initialUser } = await import('./mockData');
+      return {
+        users: [initialUser],
+        totalCount: 1,
+        activeCount: 1,
+        lockedCount: 0,
+        verifiedCount: initialUser.kycStatus === 'verified' ? 1 : 0
+      };
+    }
+  },
+
+  async updateUserStatus(userId: string, status: 'active' | 'suspended' | 'locked'): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/users/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, status })
+    });
+    return await res.json();
+  },
+
+  async updateUserTier(userId: string, tier: string): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/users/update-tier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, tier })
+    });
+    return await res.json();
+  },
+
+  async resetUserPassword(userId: string, tempPassword?: string): Promise<{ success: boolean; tempPassword?: string; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/users/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, tempPassword })
+    });
+    return await res.json();
+  },
+
+  async adjustUserBalance(userId: string, currency: string, amount: number): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/users/adjust-balance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, currency, amount })
+    });
+    return await res.json();
   }
 };
