@@ -313,7 +313,7 @@ export const UserAuthModal: React.FC = () => {
                 <input
                   type={accountType === 'email' ? 'email' : 'tel'}
                   required
-                  value={emailOrPhone}
+                  value={emailOrPhone || ''}
                   onChange={e => setEmailOrPhone(e.target.value)}
                   placeholder={accountType === 'email' ? 'mai.tran@gmail.com' : '0912345678'}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -342,7 +342,7 @@ export const UserAuthModal: React.FC = () => {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  value={password}
+                  value={password || ''}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-10 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
@@ -435,7 +435,7 @@ export const UserAuthModal: React.FC = () => {
               <input
                 type="text"
                 required
-                value={fullName}
+                value={fullName || ''}
                 onChange={e => setFullName(e.target.value)}
                 placeholder="VD: NGUYỄN HOÀNG LONG (như trên CCCD)"
                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -450,7 +450,7 @@ export const UserAuthModal: React.FC = () => {
                 <input
                   type="email"
                   required
-                  value={regEmail}
+                  value={regEmail || ''}
                   onChange={e => setRegEmail(e.target.value)}
                   placeholder="long.nguyen@gmail.com"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -463,7 +463,7 @@ export const UserAuthModal: React.FC = () => {
                 </label>
                 <input
                   type="tel"
-                  value={regPhone}
+                  value={regPhone || ''}
                   onChange={e => setRegPhone(e.target.value)}
                   placeholder="0933888999"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -479,7 +479,7 @@ export const UserAuthModal: React.FC = () => {
                 <input
                   type="password"
                   required
-                  value={regPassword}
+                  value={regPassword || ''}
                   onChange={e => setRegPassword(e.target.value)}
                   placeholder="Ít nhất 6 ký tự"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
@@ -493,7 +493,7 @@ export const UserAuthModal: React.FC = () => {
                 <input
                   type="password"
                   required
-                  value={regConfirmPassword}
+                  value={regConfirmPassword || ''}
                   onChange={e => setRegConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
@@ -522,7 +522,7 @@ export const UserAuthModal: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={regIdCardNumber}
+                value={regIdCardNumber || ''}
                 onChange={e => setRegIdCardNumber(e.target.value)}
                 placeholder="079094012345 (12 số CCCD)"
                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
@@ -543,7 +543,7 @@ export const UserAuthModal: React.FC = () => {
                 <div className="mt-2">
                   <input
                     type="text"
-                    value={referralCode}
+                    value={referralCode || ''}
                     onChange={e => setReferralCode(e.target.value)}
                     placeholder="VD: MEXC888"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500 uppercase"

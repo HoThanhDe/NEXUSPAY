@@ -570,7 +570,7 @@ export const ExchangeWidget: React.FC = () => {
               <input
                 id="fiat-amount-input"
                 type="number"
-                value={fiatAmountVND || ''}
+                value={fiatAmountVND ?? ''}
                 onChange={e => handleFiatChange(Math.max(0, Number(e.target.value)))}
                 placeholder="0"
                 className="w-full bg-transparent text-2xl sm:text-3xl font-bold font-mono text-white placeholder-slate-600 focus:outline-none"
@@ -622,7 +622,7 @@ export const ExchangeWidget: React.FC = () => {
               <input
                 id="crypto-amount-input"
                 type="number"
-                value={cryptoAmount || ''}
+                value={cryptoAmount ?? ''}
                 onChange={e => handleCryptoChange(Math.max(0, Number(e.target.value)))}
                 placeholder="0"
                 className={`w-full bg-transparent text-2xl sm:text-3xl font-bold font-mono focus:outline-none ${
@@ -688,7 +688,7 @@ export const ExchangeWidget: React.FC = () => {
                 <input
                   id="recipient-wallet-input"
                   type="text"
-                  value={recipientWallet}
+                  value={recipientWallet || ''}
                   onChange={e => setRecipientWallet(e.target.value)}
                   placeholder={t('recipientAddressPlaceholder')}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 pr-20"
@@ -724,7 +724,7 @@ export const ExchangeWidget: React.FC = () => {
                   <label className="text-[11px] text-slate-400 block mb-1">Tên ngân hàng</label>
                   <input
                     type="text"
-                    value={bankName}
+                    value={bankName || ''}
                     onChange={e => setBankName(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                     placeholder="VD: Vietcombank, Techcombank..."
@@ -734,7 +734,7 @@ export const ExchangeWidget: React.FC = () => {
                   <label className="text-[11px] text-slate-400 block mb-1">Số tài khoản</label>
                   <input
                     type="text"
-                    value={accountNumber}
+                    value={accountNumber || ''}
                     onChange={e => setAccountNumber(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
                     placeholder="10188992233"
@@ -746,7 +746,7 @@ export const ExchangeWidget: React.FC = () => {
                 <label className="text-[11px] text-slate-400 block mb-1">Tên chủ tài khoản (In hoa không dấu)</label>
                 <input
                   type="text"
-                  value={accountName}
+                  value={accountName || ''}
                   onChange={e => setAccountName(e.target.value.toUpperCase())}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
                   placeholder="NGUYEN VAN AN"

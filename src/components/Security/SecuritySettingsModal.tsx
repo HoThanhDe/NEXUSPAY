@@ -207,7 +207,7 @@ export const SecuritySettingsModal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <input
                 type="text"
-                value={totpCode}
+                value={totpCode || ''}
                 onChange={e => setTotpCode(e.target.value)}
                 placeholder="Nhập 6 số OTP (VD: 123456)"
                 maxLength={6}

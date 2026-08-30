@@ -128,7 +128,7 @@ export const AdminAuthModal: React.FC = () => {
               <input
                 type="text"
                 required
-                value={account}
+                value={account || ''}
                 onChange={e => setAccount(e.target.value)}
                 placeholder="admin hoặc admin@nexus.vn"
                 className="w-full pl-10 pr-3.5 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono"
@@ -146,7 +146,7 @@ export const AdminAuthModal: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                value={password}
+                value={password || ''}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Nhập mật khẩu (admin888 hoặc nexus2026)"
                 className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono"
@@ -172,7 +172,7 @@ export const AdminAuthModal: React.FC = () => {
               <input
                 type="password"
                 maxLength={6}
-                value={pinCode}
+                value={pinCode || ''}
                 onChange={e => setPinCode(e.target.value)}
                 placeholder="Mã PIN 4 số (8888 hoặc 1234)"
                 className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest text-sm"

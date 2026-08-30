@@ -308,7 +308,7 @@ export const UserProfileView: React.FC = () => {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={currentPassword}
+                  value={currentPassword || ''}
                   onChange={e => setCurrentPassword(e.target.value)}
                   placeholder="Nhập mật khẩu hiện tại (hoặc để trống nếu mặc định)"
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 pr-10 font-mono"
@@ -327,7 +327,7 @@ export const UserProfileView: React.FC = () => {
               <label className="block text-slate-400 mb-1 font-medium">Mật khẩu mới</label>
               <input
                 type={showPassword ? 'text' : 'password'}
-                value={newPassword}
+                value={newPassword || ''}
                 onChange={e => setNewPassword(e.target.value)}
                 required
                 placeholder="Tối thiểu 6 ký tự (kết hợp chữ và số)"
@@ -339,7 +339,7 @@ export const UserProfileView: React.FC = () => {
               <label className="block text-slate-400 mb-1 font-medium">Xác nhận mật khẩu mới</label>
               <input
                 type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
+                value={confirmPassword || ''}
                 onChange={e => setConfirmPassword(e.target.value)}
                 required
                 placeholder="Nhập lại mật khẩu mới"

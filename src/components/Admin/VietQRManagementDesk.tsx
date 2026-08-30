@@ -20,24 +20,22 @@ import {
   Copy,
   Check,
   CreditCard,
-  Sparkles
+  Sparkles,
+  Layers,
+  Search,
+  Code
 } from 'lucide-react';
-import { QRCode } from '../../utils/qrcode';
+import { 
+  VIETNAM_BANKS, 
+  buildVietQREMVCo, 
+  buildVietQRImageUrl, 
+  generateVietQRDataURL, 
+  findBank,
+  VietQRBank 
+} from '../../utils/vietqr';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { VietQRConfig } from '../../types';
-
-const POPULAR_BANKS = [
-  { name: 'Vietcombank (Ngân hàng TMCP Ngoại thương Việt Nam)', short: 'VCB', code: '970436', logo: 'VCB' },
-  { name: 'MB Bank (Ngân hàng TMCP Quân đội)', short: 'MB', code: '970422', logo: 'MB' },
-  { name: 'Techcombank (Ngân hàng Kỹ thương Việt Nam)', short: 'TCB', code: '970407', logo: 'TCB' },
-  { name: 'ACB (Ngân hàng TMCP Á Châu)', short: 'ACB', code: '970416', logo: 'ACB' },
-  { name: 'VPBank (Ngân hàng TMCP Việt Nam Thịnh Vượng)', short: 'VPB', code: '970432', logo: 'VPB' },
-  { name: 'TPBank (Ngân hàng TMCP Tiên Phong)', short: 'TPB', code: '970423', logo: 'TPB' },
-  { name: 'BIDV (Ngân hàng TMCP Đầu tư và Phát triển Việt Nam)', short: 'BIDV', code: '970418', logo: 'BIDV' },
-  { name: 'Agribank (Ngân hàng Nông nghiệp và Phát triển Nông thôn)', short: 'VBA', code: '970405', logo: 'VBA' },
-  { name: 'Sacombank (Ngân hàng TMCP Sài Gòn Thương Tín)', short: 'STB', code: '970403', logo: 'STB' }
-];
 
 export const VietQRManagementDesk: React.FC = () => {
   const { addNotification, refreshVietQrConfig } = useApp();
@@ -56,13 +54,18 @@ export const VietQRManagementDesk: React.FC = () => {
   const [autoConfirmDeposit, setAutoConfirmDeposit] = useState(true);
   const [testMode, setTestMode] = useState(false);
 
+  // Search bank filter
+  const [bankSearch, setBankSearch] = useState('');
+
   const [showSecret, setShowSecret] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [previewQrUrl, setPreviewQrUrl] = useState('');
+  const [previewEmvco, setPreviewEmvco] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<'card' | 'pure_emvco'>('card');
 
   // Load existing configuration from API
   const loadConfig = async () => {
@@ -93,20 +96,31 @@ export const VietQRManagementDesk: React.FC = () => {
 
   // Update dynamic QR Preview whenever bank details change
   useEffect(() => {
-    const payload = `24/7_NAPAS_${bankShort}_${accountNumber}_1000000_${gatewayMemoPrefix}_PREVIEW`;
-    QRCode.toDataURL(payload, {
-      width: 240,
-      margin: 2,
-      color: { dark: '#0f172a', light: '#ffffff' }
-    })
+    const cleanBin = bankCode || '970436';
+    const memo = `${gatewayMemoPrefix}_PREVIEW`;
+    const emvco = buildVietQREMVCo({
+      bankBin: cleanBin,
+      accountNumber,
+      amount: 1000000,
+      memo
+    });
+    setPreviewEmvco(emvco);
+
+    generateVietQRDataURL({
+      bankBin: cleanBin,
+      accountNumber,
+      accountName,
+      amount: 1000000,
+      memo
+    }, 280)
     .then(url => setPreviewQrUrl(url))
     .catch(err => console.error('QR preview error:', err));
-  }, [bankShort, accountNumber, gatewayMemoPrefix]);
+  }, [bankCode, bankShort, accountNumber, accountName, gatewayMemoPrefix]);
 
-  const handleSelectPopularBank = (bank: typeof POPULAR_BANKS[0]) => {
+  const handleSelectBank = (bank: VietQRBank) => {
     setBankName(bank.name);
-    setBankShort(bank.short);
-    setBankCode(bank.code);
+    setBankShort(bank.shortName);
+    setBankCode(bank.bin);
   };
 
   const handleSaveConfig = async (e: React.FormEvent) => {
@@ -133,8 +147,8 @@ export const VietQRManagementDesk: React.FC = () => {
         await refreshVietQrConfig();
         addNotification(
           'order_success',
-          'Cập nhật VietQR thành công',
-          `Hệ thống đã cập nhật số tài khoản nhận tiền: ${bankShort} - ${accountNumber} (${accountName}).`
+          'Cập nhật VietQR chuẩn quốc gia thành công',
+          `Hệ thống đã đồng bộ số tài khoản nhận tiền: ${bankShort} - ${accountNumber} (BIN: ${bankCode}) cho toàn bộ cổng thanh toán.`
         );
         setTimeout(() => setSaveSuccessMsg(''), 4000);
       }
@@ -152,7 +166,7 @@ export const VietQRManagementDesk: React.FC = () => {
       const res = await api.testVietQRConnection();
       setTestResult(res);
       if (res.success) {
-        addNotification('order_success', 'Kiểm tra API VietQR', res.message);
+        addNotification('order_success', 'Kiểm tra API VietQR Chuẩn', res.message);
       }
     } catch (err: any) {
       setTestResult({ success: false, message: err.message || 'Lỗi kết nối API ngân hàng.' });
@@ -167,26 +181,41 @@ export const VietQRManagementDesk: React.FC = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const filteredBanks = VIETNAM_BANKS.filter(b => 
+    b.name.toLowerCase().includes(bankSearch.toLowerCase()) ||
+    b.shortName.toLowerCase().includes(bankSearch.toLowerCase()) ||
+    b.bin.includes(bankSearch)
+  );
+
+  const previewCardUrl = buildVietQRImageUrl({
+    bankBin: bankCode || '970436',
+    accountNumber,
+    accountName,
+    amount: 1000000,
+    memo: `${gatewayMemoPrefix}_PREVIEW`,
+    template: 'compact2'
+  });
+
   return (
     <div className="w-full space-y-6">
       {/* Top Banner */}
       <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md">
               <QrCode className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-lg font-bold text-white tracking-tight">
-                  Cấu Hình VietQR & Kết Nối API Ngân Hàng Napas
+                  Quản Trị Cổng VietQR Chuẩn Quốc Gia (Napas 24/7 • EMVCo)
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
-                  Admin Only
+                  Chuẩn VietQR.vn / PayOS / SePay
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Chỉnh sửa số tài khoản nhận tiền, tên ngân hàng thụ hưởng, tiền tố chuyển khoản và API đối tác VietQR 24/7
+                Tự động tạo mã QR EMVCo theo chuẩn Ngân Hàng Nhà Nước Việt Nam & NAPAS, hỗ trợ quét mã từ tất cả app ngân hàng (VCB, MB, TCB, VPB, ACB...)
               </p>
             </div>
           </div>
@@ -197,10 +226,10 @@ export const VietQRManagementDesk: React.FC = () => {
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting}
-            className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-semibold flex items-center space-x-2 transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-semibold flex items-center space-x-2 transition-colors disabled:opacity-50 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
-            <span>{isTesting ? 'Đang Test API...' : 'Kiểm Tra Kết Nối API'}</span>
+            <span>{isTesting ? 'Đang Test API...' : 'Kiểm Tra Kết Nối Napas API'}</span>
           </button>
         </div>
       </div>
@@ -221,7 +250,7 @@ export const VietQRManagementDesk: React.FC = () => {
             <div className="font-bold">{testResult.message}</div>
             {testResult.latencyMs && (
               <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                Độ trễ phản hồi: <strong className="text-white">{testResult.latencyMs}ms</strong> • Mã ngân hàng: <strong className="text-white">{testResult.bankShort}</strong> • Tên chủ TK: <strong className="text-white">{testResult.accountName}</strong>
+                Độ trễ phản hồi: <strong className="text-white">{testResult.latencyMs}ms</strong> • Mã BIN: <strong className="text-white">{testResult.bankShort || bankCode}</strong> • Tên chủ TK: <strong className="text-white">{testResult.accountName || accountName}</strong>
               </div>
             )}
           </div>
@@ -240,25 +269,38 @@ export const VietQRManagementDesk: React.FC = () => {
         {/* Left Form: 2 Cols */}
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSaveConfig} className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-6">
-            {/* Quick Bank Selector */}
+            {/* Quick Bank Selector with Search */}
             <div>
-              <label className="text-xs font-bold text-slate-200 block mb-2">
-                1. Chọn nhanh Ngân Hàng Nhận Tiền Thụ Hưởng
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {POPULAR_BANKS.map(b => (
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-200 block">
+                  1. Chọn Ngân Hàng Nhận Tiền Thụ Hưởng (Toàn bộ 40+ Ngân Hàng Việt Nam)
+                </label>
+                <div className="relative w-48">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên/BIN..."
+                    value={bankSearch || ''}
+                    onChange={e => setBankSearch(e.target.value)}
+                    className="w-full pl-8 pr-2 py-1 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 bg-slate-950/60 rounded-2xl border border-slate-800">
+                {filteredBanks.map(b => (
                   <button
-                    key={b.short}
+                    key={b.bin}
                     type="button"
-                    onClick={() => handleSelectPopularBank(b)}
-                    className={`p-2.5 rounded-xl border text-center transition-all ${
-                      bankShort === b.short 
+                    onClick={() => handleSelectBank(b)}
+                    className={`p-2 rounded-xl border text-center transition-all ${
+                      bankCode === b.bin 
                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold shadow-md shadow-emerald-500/20' 
-                        : 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300 text-xs'
+                        : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 text-xs'
                     }`}
                   >
-                    <span className="block font-bold text-sm">{b.short}</span>
-                    <span className="text-[10px] text-slate-400 truncate block">{b.name.split('(')[0]}</span>
+                    <span className="block font-bold text-xs">{b.shortName}</span>
+                    <span className="text-[9px] text-slate-400 font-mono block">BIN: {b.bin}</span>
                   </button>
                 ))}
               </div>
@@ -273,7 +315,7 @@ export const VietQRManagementDesk: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={bankName}
+                  value={bankName || ''}
                   onChange={e => setBankName(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
@@ -281,15 +323,15 @@ export const VietQRManagementDesk: React.FC = () => {
 
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1">
-                  Mã Ngân Hàng (Napas BIN)
+                  Mã Ngân Hàng (Napas BIN 6 Số) <span className="text-emerald-400">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={bankCode}
+                  value={bankCode || ''}
                   onChange={e => setBankCode(e.target.value)}
                   placeholder="970436"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono font-bold"
                 />
               </div>
             </div>
@@ -303,7 +345,7 @@ export const VietQRManagementDesk: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={accountNumber}
+                  value={accountNumber || ''}
                   onChange={e => setAccountNumber(e.target.value)}
                   placeholder="998825420001"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white font-mono font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -317,9 +359,9 @@ export const VietQRManagementDesk: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={accountName}
+                  value={accountName || ''}
                   onChange={e => setAccountName(e.target.value.toUpperCase())}
-                  placeholder="NEXUS GATEWAY TECH JSC"
+                  placeholder="NEXUS GATEWAY GLOBAL TECH JSC"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -330,17 +372,17 @@ export const VietQRManagementDesk: React.FC = () => {
               <label className="text-xs font-semibold text-slate-300 block mb-1">
                 Tiền Tố Nội Dung Chuyển Khoản (Gateway Memo Prefix)
               </label>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <input
                   type="text"
                   required
-                  value={gatewayMemoPrefix}
+                  value={gatewayMemoPrefix || ''}
                   onChange={e => setGatewayMemoPrefix(e.target.value.toUpperCase())}
                   placeholder="NEXUSPAY"
                   className="w-48 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
                 />
                 <span className="text-xs text-slate-400">
-                  Ví dụ: <strong className="text-emerald-400 font-mono">{gatewayMemoPrefix} TXN-5829-VND</strong> (Hệ thống dựa vào tiền tố này để tự động cộng tiền cho khách)
+                  Ví dụ: <strong className="text-emerald-400 font-mono">{gatewayMemoPrefix} TXN-5829-VND</strong> (Khớp lệnh tự động)
                 </span>
               </div>
             </div>
@@ -350,18 +392,18 @@ export const VietQRManagementDesk: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Key className="w-4 h-4 text-cyan-400" />
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  2. Cấu Hình Kết Nối API Đối Tác VietQR / Napas Gateway
+                  2. Cấu Hình Tích Hợp API VietQR / PayOS / SePay Gateway
                 </h4>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-300 block mb-1">
-                    Partner API Key
+                    Partner Client / API Key
                   </label>
                   <input
                     type="text"
-                    value={partnerApiKey}
+                    value={partnerApiKey || ''}
                     onChange={e => setPartnerApiKey(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
@@ -369,12 +411,12 @@ export const VietQRManagementDesk: React.FC = () => {
 
                 <div>
                   <label className="text-xs font-semibold text-slate-300 block mb-1">
-                    Partner Secret Token
+                    Partner Secret Token / Checksum Key
                   </label>
                   <div className="relative">
                     <input
                       type={showSecret ? 'text' : 'password'}
-                      value={partnerApiSecret}
+                      value={partnerApiSecret || ''}
                       onChange={e => setPartnerApiSecret(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-4 pr-10 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
                     />
@@ -396,7 +438,7 @@ export const VietQRManagementDesk: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <input
                     type="url"
-                    value={webhookUrl}
+                    value={webhookUrl || ''}
                     onChange={e => setWebhookUrl(e.target.value)}
                     placeholder="https://api.domain.com/v1/vietqr/callback"
                     className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
@@ -423,7 +465,7 @@ export const VietQRManagementDesk: React.FC = () => {
                   />
                   <div>
                     <span className="text-xs font-semibold text-white block">Tự động khớp lệnh khi tiền về</span>
-                    <span className="text-[10px] text-slate-400">Tự động kích hoạt Smart Contract phát hành USDT</span>
+                    <span className="text-[10px] text-slate-400">Tự động kích hoạt Smart Contract phát hành USDT/Crypto</span>
                   </div>
                 </label>
 
@@ -436,7 +478,7 @@ export const VietQRManagementDesk: React.FC = () => {
                   />
                   <div>
                     <span className="text-xs font-semibold text-white block">Chế độ Sandbox / Testnet</span>
-                    <span className="text-[10px] text-slate-400">Sử dụng môi trường kiểm thử không trừ tiền thật</span>
+                    <span className="text-[10px] text-slate-400">Môi trường kiểm thử độc lập không trừ tiền thật</span>
                   </div>
                 </label>
               </div>
@@ -453,7 +495,7 @@ export const VietQRManagementDesk: React.FC = () => {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Lưu Cấu Hình VietQR & Cổng Ngân Hàng Ngay</span>
+                  <span>Lưu Cấu Hình VietQR Chuẩn Quốc Gia Ngay</span>
                 </>
               )}
             </button>
@@ -463,26 +505,64 @@ export const VietQRManagementDesk: React.FC = () => {
         {/* Right Col: Live QR Generator Preview */}
         <div className="space-y-6">
           <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl flex flex-col items-center text-center">
-            <div className="flex items-center space-x-2 mb-4">
+            <div className="flex items-center space-x-2 mb-3">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                Xem Trước Mã VietQR Sinh Thời Gian Thực
+                Mã VietQR Sinh Thời Gian Thực
               </h4>
             </div>
 
+            {/* Preview Mode Switcher */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 mb-3 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => setPreviewMode('card')}
+                className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                  previewMode === 'card' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Thẻ Napas 24/7
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode('pure_emvco')}
+                className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                  previewMode === 'pure_emvco' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Mã EMVCo Thuần
+              </button>
+            </div>
+
             {/* QR Box */}
-            <div className="p-3 bg-white rounded-3xl shadow-2xl inline-block mb-4">
-              {previewQrUrl ? (
-                <img src={previewQrUrl} alt="VietQR Preview" className="w-48 h-48 rounded-xl" />
+            <div className="p-2 bg-white rounded-2xl shadow-2xl inline-block mb-3 max-w-full">
+              {previewMode === 'card' ? (
+                <img 
+                  src={previewCardUrl} 
+                  alt="VietQR Card Preview" 
+                  onError={(e) => {
+                    if (previewQrUrl) (e.target as HTMLImageElement).src = previewQrUrl;
+                  }}
+                  className="w-52 h-auto rounded-xl object-contain" 
+                />
               ) : (
-                <div className="w-48 h-48 bg-slate-100 animate-pulse rounded-xl" />
+                <div className="p-2">
+                  {previewQrUrl ? (
+                    <img src={previewQrUrl} alt="VietQR Preview" className="w-48 h-48 rounded-lg" />
+                  ) : (
+                    <div className="w-48 h-48 bg-slate-100 animate-pulse rounded-lg" />
+                  )}
+                  <div className="mt-1 text-[9px] font-bold text-slate-800">
+                    EMVCo • BIN {bankCode}
+                  </div>
+                </div>
               )}
             </div>
 
             <div className="w-full space-y-2 text-left text-xs bg-slate-950 p-4 rounded-2xl border border-slate-800">
               <div className="flex justify-between">
                 <span className="text-slate-400">Ngân hàng:</span>
-                <strong className="text-white">{bankShort} - {bankCode}</strong>
+                <strong className="text-white">{bankShort} (BIN: {bankCode})</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Số tài khoản:</span>
@@ -498,19 +578,32 @@ export const VietQRManagementDesk: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-              Mã QR này sẽ lập tức được hiển thị cho tất cả khách hàng khi họ chọn phương thức thanh toán VietQR Napas trên trang Mua Crypto.
-            </p>
+            {/* EMVCo Payload Box */}
+            <div className="w-full mt-3 text-left">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span>Chuỗi Payload chuẩn EMVCo:</span>
+                <button 
+                  onClick={() => copyText(previewEmvco, 'preview_emvco')}
+                  className="text-cyan-400 hover:underline flex items-center space-x-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedKey === 'preview_emvco' ? 'Đã sao chép' : 'Sao chép'}</span>
+                </button>
+              </div>
+              <p className="p-2 bg-slate-950 rounded-xl border border-slate-800 text-[9px] font-mono text-slate-400 break-all leading-tight">
+                {previewEmvco}
+              </p>
+            </div>
           </div>
 
-          {/* Quick API Documentation Box */}
+          {/* Quick Info Box */}
           <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl text-xs space-y-3">
             <div className="flex items-center space-x-2 text-cyan-400 font-bold">
               <Building2 className="w-4 h-4" />
-              <span>Tiêu chuẩn Napas 24/7 VietQR</span>
+              <span>Tiêu chuẩn Napas 24/7 & VietQR</span>
             </div>
             <p className="text-slate-400 text-[11px] leading-relaxed">
-              Chuẩn Napas VietQR định dạng EMVCo hỗ trợ quét mã từ hơn 40 ứng dụng ngân hàng tại Việt Nam (VCB Digibank, MB Bank, Techcombank Mobile, Cake, Timo, v.v.).
+              Mã QR tuân thủ nghiêm ngặt chuẩn EMVCo của Ngân Hàng Nhà Nước Việt Nam. Cho phép khách hàng mở bất kỳ ứng dụng ngân hàng nào để quét mã thanh toán tức thì với số tiền và nội dung tự động điền chính xác.
             </p>
           </div>
         </div>

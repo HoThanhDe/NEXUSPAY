@@ -511,7 +511,7 @@ export const KYCCenterModal: React.FC = () => {
                 <label className="text-slate-400 block mb-1 font-medium">{t('fullName')}</label>
                 <input
                   type="text"
-                  value={fullName}
+                  value={fullName || ''}
                   onChange={e => setFullName(e.target.value.toUpperCase())}
                   required
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono"
@@ -522,7 +522,7 @@ export const KYCCenterModal: React.FC = () => {
                 <label className="text-slate-400 block mb-1 font-medium">{t('dateOfBirth')}</label>
                 <input
                   type="date"
-                  value={dob}
+                  value={dob || ''}
                   onChange={e => setDob(e.target.value)}
                   required
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500"
@@ -533,7 +533,7 @@ export const KYCCenterModal: React.FC = () => {
                 <label className="text-slate-400 block mb-1 font-medium">{t('idCardNumber')}</label>
                 <input
                   type="text"
-                  value={idCardNumber}
+                  value={idCardNumber || ''}
                   onChange={e => setIdCardNumber(e.target.value)}
                   required
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono"
@@ -545,7 +545,7 @@ export const KYCCenterModal: React.FC = () => {
                   <label className="text-slate-400 block mb-1 font-medium">{t('passportNumber')}</label>
                   <input
                     type="text"
-                    value={passportNumber}
+                    value={passportNumber || ''}
                     onChange={e => setPassportNumber(e.target.value)}
                     required
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono"
@@ -557,7 +557,7 @@ export const KYCCenterModal: React.FC = () => {
                 <label className="text-slate-400 block mb-1 font-medium">Địa chỉ thường trú / Nơi cư trú</label>
                 <input
                   type="text"
-                  value={address}
+                  value={address || ''}
                   onChange={e => setAddress(e.target.value)}
                   required
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500"

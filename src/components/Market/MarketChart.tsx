@@ -218,7 +218,7 @@ export const MarketChart: React.FC = () => {
               <span>{t('priceAlert')}:</span>
               <input
                 type="number"
-                value={targetAlertPrice}
+                value={targetAlertPrice ?? 0}
                 onChange={e => setTargetAlertPrice(Number(e.target.value))}
                 className="w-32 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono font-bold text-white focus:outline-none focus:border-cyan-400"
               />

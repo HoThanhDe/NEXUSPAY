@@ -23,6 +23,7 @@ import {
 import { PaymentPayoutRecord } from '../../types';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { buildVietQRImageUrl, findBank, getBankOrDefault } from '../../utils/vietqr';
 
 export const PaymentManagementDesk: React.FC = () => {
   const { addNotification } = useApp();
@@ -503,14 +504,25 @@ export const PaymentManagementDesk: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-4 bg-white rounded-2xl w-fit mx-auto shadow-2xl">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                  `24/7_NAPAS_${qrPayoutModal.bankName}_${qrPayoutModal.accountNumber}_${qrPayoutModal.amountVND}_${qrPayoutModal.transferMemo}`
-                )}`}
-                alt="VietQR Payout"
-                className="w-52 h-52"
-              />
+            <div className="p-2 bg-white rounded-2xl w-fit mx-auto shadow-2xl">
+              {(() => {
+                const matchedBank = findBank(qrPayoutModal.bankShort || qrPayoutModal.bankName) || getBankOrDefault(qrPayoutModal.bankShort);
+                const payoutQrUrl = buildVietQRImageUrl({
+                  bankBin: matchedBank.bin,
+                  accountNumber: qrPayoutModal.accountNumber,
+                  accountName: qrPayoutModal.accountName,
+                  amount: qrPayoutModal.amountVND,
+                  memo: qrPayoutModal.transferMemo,
+                  template: 'compact2'
+                });
+                return (
+                  <img
+                    src={payoutQrUrl}
+                    alt="VietQR Payout Quốc Gia"
+                    className="w-56 h-auto rounded-xl object-contain"
+                  />
+                );
+              })()}
             </div>
 
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-left space-y-1">

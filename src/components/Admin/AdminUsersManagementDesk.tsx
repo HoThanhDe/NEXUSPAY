@@ -212,7 +212,7 @@ export const AdminUsersManagementDesk: React.FC = () => {
                 <input
                   type="number"
                   step="any"
-                  value={adjustBalanceModal.amount}
+                  value={adjustBalanceModal.amount ?? 0}
                   onChange={e => setAdjustBalanceModal({ ...adjustBalanceModal, amount: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold"
                 />
@@ -276,7 +276,7 @@ export const AdminUsersManagementDesk: React.FC = () => {
           <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
           <input
             type="text"
-            value={search}
+            value={search || ''}
             onChange={e => setSearch(e.target.value)}
             placeholder="Tìm theo tên, email, UID, CCCD, SĐT..."
             className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-cyan-500"
