@@ -532,10 +532,10 @@ export const AdminSubAdminsManagementDesk: React.FC = () => {
                       type="button"
                       onClick={() => handleOpenEditPerms(admin)}
                       className="px-3 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-800 flex items-center space-x-1.5 transition-colors"
-                      title="Điều chỉnh phân quyền sử dụng"
+                      title="Sửa thông tin email, số điện thoại và phân quyền sử dụng"
                     >
-                      <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                      <span>{language === 'vi' ? 'Phân Quyền' : 'Permissions'}</span>
+                      <Edit3 className="w-3.5 h-3.5 text-purple-400" />
+                      <span>{language === 'vi' ? 'Sửa & Phân Quyền' : 'Edit & Perms'}</span>
                     </button>
 
                     <button
@@ -786,10 +786,10 @@ export const AdminSubAdminsManagementDesk: React.FC = () => {
 
             <div className="flex items-center space-x-3.5 border-b border-slate-800 pb-4">
               <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/40 flex items-center justify-center">
-                <Sliders className="w-6 h-6" />
+                <Edit3 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Điều Chỉnh Quyền Hạn Quản Trị</h3>
+                <h3 className="text-lg font-bold text-white">Chỉnh Sửa Thông Tin & Phân Quyền Quản Trị</h3>
                 <p className="text-xs text-purple-300/80">Tài khoản: <strong className="text-white font-mono">@{selectedAdmin.username}</strong> ({selectedAdmin.name})</p>
               </div>
             </div>
@@ -798,26 +798,63 @@ export const AdminSubAdminsManagementDesk: React.FC = () => {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-slate-300 mb-1 font-semibold">Họ Và Tên</label>
+                  <label className="block text-slate-300 mb-1 font-semibold flex items-center space-x-1">
+                    <User className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Họ Và Tên</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                    placeholder="Họ tên quản trị viên"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 mb-1 font-semibold">Trạng Thái Tài Khoản</label>
+                  <label className="block text-slate-300 mb-1 font-semibold flex items-center space-x-1">
+                    <Shield className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Trạng Thái Tài Khoản</span>
+                  </label>
                   <select
                     value={editStatus}
                     disabled={selectedAdmin.isMaster}
                     onChange={e => setEditStatus(e.target.value as any)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-medium"
                   >
-                    <option value="active">Hoạt Động (Active)</option>
-                    <option value="locked">Tạm Khóa (Locked)</option>
+                    <option value="active">🟢 Hoạt Động (Active)</option>
+                    <option value="locked">🔴 Tạm Khóa (Locked)</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold flex items-center space-x-1">
+                    <Mail className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Email Liên Hệ / Nhận OTP</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={e => setEditEmail(e.target.value)}
+                    placeholder="email@nexus.vn"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold flex items-center space-x-1">
+                    <Phone className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Số Điện Thoại Liên Hệ</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={e => setEditPhone(e.target.value)}
+                    placeholder="0901234567"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
                 </div>
               </div>
 

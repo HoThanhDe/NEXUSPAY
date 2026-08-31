@@ -343,6 +343,20 @@ export interface VietQRConfig {
   lastUpdated?: string;
 }
 
+export interface PriceAlert {
+  id: string;
+  symbol: CryptoSymbol;
+  targetPriceVND: number;
+  condition: 'above' | 'below';
+  notifyBrowser: boolean;
+  notifyEmail: boolean;
+  emailAddress?: string;
+  status: 'active' | 'triggered' | 'paused';
+  createdAt: string;
+  triggeredAt?: string;
+  initialPriceVND: number;
+}
+
 export interface UserAuthResponse {
   success: boolean;
   user?: UserProfile;
