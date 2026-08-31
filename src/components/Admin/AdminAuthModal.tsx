@@ -8,13 +8,14 @@ export const AdminAuthModal: React.FC = () => {
     isAdminAuthModalOpen, 
     setIsAdminAuthModalOpen, 
     setIsAdminUnlocked, 
+    setCurrentAdmin,
     setActiveTab, 
     addNotification 
   } = useApp();
 
-  const [account, setAccount] = useState('admin');
-  const [password, setPassword] = useState('admin888');
-  const [pinCode, setPinCode] = useState('8888');
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [pinCode, setPinCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -23,49 +24,54 @@ export const AdminAuthModal: React.FC = () => {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!account.trim() || !password) {
+      setErrorMsg('Vui lòng nhập đầy đủ tài khoản và mật khẩu quản trị.');
+      return;
+    }
+
     setIsVerifying(true);
     setErrorMsg(null);
 
     try {
       const res = await api.verifyAdminAuth({
-        account,
-        username: account,
-        email: account,
-        password,
-        pinCode
+        account: account.trim(),
+        username: account.trim(),
+        email: account.trim(),
+        password: password.trim(),
+        pinCode: pinCode.trim()
       });
 
       if (res.authorized) {
+        if (res.admin) {
+          setCurrentAdmin(res.admin);
+        } else {
+          setCurrentAdmin({
+            id: 'ADM-AUTH',
+            username: account.trim(),
+            name: res.adminName || 'Quản Trị Viên',
+            email: res.adminEmail || '',
+            isMaster: res.isMaster ?? false,
+            status: 'active',
+            permissions: res.permissions || ['admin_users', 'transaction_management', 'kyc_review'],
+            createdAt: new Date().toISOString()
+          });
+        }
         setIsAdminUnlocked(true);
         setIsAdminAuthModalOpen(false);
         setActiveTab('admin');
         addNotification(
           'security_alert',
           'Xác Thực Quản Trị Viên Thành Công',
-          'Chào mừng Tổng Quản Trị Viên! Quyền duyệt KYC khách hàng, quản lý người dùng và cấu hình tỷ giá đã được kích hoạt.'
+          res.message || 'Chào mừng Quản Trị Viên! Quyền điều hành hệ thống đã được xác thực an toàn.'
         );
       } else {
-        setErrorMsg(res.error || 'Tài khoản, mật khẩu hoặc mã PIN Quản trị viên không chính xác.');
+        setErrorMsg(res.error || 'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi xác thực hệ thống.');
+      setErrorMsg('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin xác thực.');
     } finally {
       setIsVerifying(false);
     }
-  };
-
-  const handleQuickDemoAdminLogin = () => {
-    setAccount('admin');
-    setPassword('admin888');
-    setPinCode('8888');
-    setIsAdminUnlocked(true);
-    setIsAdminAuthModalOpen(false);
-    setActiveTab('admin');
-    addNotification(
-      'security_alert',
-      'Đăng Nhập Quản Trị Viên Thành Công',
-      'Đã mở khóa Bàn làm việc Quản trị viên tối cao (Master Desk).'
-    );
   };
 
   return (
@@ -91,11 +97,11 @@ export const AdminAuthModal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <h3 className="text-base font-bold text-white tracking-tight">Cổng Đăng Nhập Quản Trị Viên</h3>
               <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30">
-                Master Admin
+                RBAC Security
               </span>
             </div>
             <p className="text-xs text-purple-300/80 mt-0.5">
-              Yêu cầu tài khoản & mật khẩu đặc quyền để phê duyệt yêu cầu khách hàng
+              Yêu cầu tài khoản & mật khẩu đặc quyền để điều hành nền tảng
             </p>
           </div>
         </div>
@@ -103,17 +109,17 @@ export const AdminAuthModal: React.FC = () => {
         <div className="text-xs text-slate-300 bg-slate-950/90 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5">
           <div className="flex items-center space-x-1.5 font-bold text-purple-300 text-[11px]">
             <Terminal className="w-3.5 h-3.5 text-purple-400" />
-            <span>Phân Quyền Phê Duyệt Khách Hàng (Admin Authority):</span>
+            <span>Phân Quyền Vận Hành Nền Tảng (Admin Authority):</span>
           </div>
           <p className="text-slate-400 text-[11px] leading-relaxed">
-            Chỉ quản trị viên đã đăng nhập mới có quyền phê duyệt hồ sơ KYC, cấp hạn mức giao dịch, điều chỉnh số dư ví, duyệt lệnh và chỉnh sửa tỷ giá thị trường.
+            Chỉ quản trị viên đã đăng nhập và được cấp quyền mới có thể truy cập các tính năng duyệt KYC, xử lý thanh toán, điều chỉnh tỷ giá và cấu hình hệ thống.
           </p>
         </div>
 
         {errorMsg && (
-          <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center space-x-2">
+          <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center space-x-2 animate-shake">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{errorMsg}</span>
+            <span className="font-medium">{errorMsg}</span>
           </div>
         )}
 
@@ -128,10 +134,11 @@ export const AdminAuthModal: React.FC = () => {
               <input
                 type="text"
                 required
-                value={account || ''}
+                autoComplete="off"
+                value={account}
                 onChange={e => setAccount(e.target.value)}
-                placeholder="admin hoặc admin@nexus.vn"
-                className="w-full pl-10 pr-3.5 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono"
+                placeholder="Nhập tên tài khoản hoặc email quản trị..."
+                className="w-full pl-10 pr-3.5 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 transition-colors font-medium"
               />
             </div>
           </div>
@@ -146,10 +153,11 @@ export const AdminAuthModal: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                value={password || ''}
+                autoComplete="new-password"
+                value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Nhập mật khẩu (admin888 hoặc nexus2026)"
-                className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono"
+                placeholder="Nhập mật khẩu quản trị..."
+                className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 transition-colors font-medium"
               />
               <button
                 type="button"
@@ -163,24 +171,24 @@ export const AdminAuthModal: React.FC = () => {
 
           {/* Optional PIN Code */}
           <div>
-            <label className="block text-slate-400 mb-1 font-medium flex items-center justify-between">
-              <span>Mã PIN Bảo Mật (Tùy chọn)</span>
-              <span className="text-[10px] text-purple-400">PIN: 8888</span>
+            <label className="block text-slate-400 mb-1 font-medium">
+              <span>Mã PIN Bảo Mật (Nếu tài khoản có cài đặt)</span>
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
               <input
                 type="password"
                 maxLength={6}
-                value={pinCode || ''}
+                autoComplete="off"
+                value={pinCode}
                 onChange={e => setPinCode(e.target.value)}
-                placeholder="Mã PIN 4 số (8888 hoặc 1234)"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest text-sm"
+                placeholder="------"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-700 focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest text-sm"
               />
             </div>
           </div>
 
-          <div className="pt-2 space-y-2.5">
+          <div className="pt-2">
             <button
               type="submit"
               disabled={isVerifying}
@@ -191,19 +199,9 @@ export const AdminAuthModal: React.FC = () => {
               ) : (
                 <>
                   <KeyRound className="w-4 h-4" />
-                  <span>Xác Thực & Đăng Nhập Quản Trị Viên</span>
+                  <span>Xác Thực & Đăng Nhập Quản Trị</span>
                 </>
               )}
-            </button>
-
-            {/* Quick Demo 1-click Admin Shortcut */}
-            <button
-              type="button"
-              onClick={handleQuickDemoAdminLogin}
-              className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-purple-300 text-xs font-semibold flex items-center justify-center space-x-1.5 border border-purple-500/30 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>⚡ Đăng Nhập Nhanh Quản Trị Viên (admin / admin888)</span>
             </button>
           </div>
         </form>

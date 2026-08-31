@@ -2,6 +2,32 @@ export type Language = 'vi' | 'en' | 'ja' | 'zh';
 
 export type KYCTier = 'tier0_unverified' | 'tier1_basic' | 'tier2_advanced';
 
+export type AdminDeskPermission = 
+  | 'admin_users'
+  | 'transaction_management'
+  | 'wallet_management'
+  | 'payment_management'
+  | 'vietqr_config'
+  | 'stats_overview'
+  | 'kyc_review'
+  | 'market_management'
+  | 'system_settings'
+  | 'admin_management';
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  phone?: string;
+  isMaster: boolean;
+  status: 'active' | 'locked';
+  permissions: string[];
+  createdAt: string;
+  lastLogin?: string;
+  createdBy?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -11,6 +37,10 @@ export interface UserProfile {
   status?: 'active' | 'suspended' | 'locked';
   kycTier: KYCTier;
   kycStatus: 'unsubmitted' | 'pending' | 'verified' | 'rejected';
+  kycRejectionReason?: string;
+  kycReviewedAt?: string;
+  kycSubmittedAt?: string;
+  kycTargetTier?: 'tier1_basic' | 'tier2_advanced';
   monthlyLimitVND: number;
   monthlyUsedVND: number;
   walletBalance: {
@@ -69,6 +99,17 @@ export interface P2PSpreadSettings {
   lastUpdated: string;
 }
 
+export interface NetworkFeeConfig {
+  network: CryptoNetwork;
+  feeUSD: number;
+  feeVND: number;
+  estimatedSeconds: number;
+  status?: 'active' | 'suspended';
+  gasPriority?: 'standard' | 'fast' | 'instant';
+  congestionLevel?: 'low' | 'medium' | 'high';
+  memoRequired?: boolean;
+}
+
 export interface CryptoRate {
   symbol: CryptoSymbol;
   name: string;
@@ -87,12 +128,7 @@ export interface CryptoRate {
   low24h: number;
   volume24hVND: number;
   p2pExchanges: P2PExchangeRate[];
-  networks: {
-    network: CryptoNetwork;
-    feeUSD: number;
-    feeVND: number;
-    estimatedSeconds: number;
-  }[];
+  networks: NetworkFeeConfig[];
 }
 
 export type PaymentMethod = 'stripe_card' | 'stripe_applepay' | 'stripe_googlepay' | 'vietqr_bank' | 'crypto_deposit';
@@ -272,12 +308,15 @@ export interface RevenueReportData {
 
 export interface InAppNotification {
   id: string;
-  type: 'order_success' | 'crypto_sent' | 'kyc_update' | 'security_alert' | 'price_alert';
+  type: 'order_success' | 'crypto_sent' | 'kyc_update' | 'security_alert' | 'price_alert' | 'admin_action' | 'system_alert';
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
   linkId?: string;
+  target?: 'user' | 'admin' | 'both';
+  userId?: string;
+  adminUsername?: string;
 }
 
 export interface SupportChatMessage {

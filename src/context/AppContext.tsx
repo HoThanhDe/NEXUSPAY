@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CryptoRate, InAppNotification, Language, Transaction, UserProfile } from '../types';
+import { CryptoRate, InAppNotification, Language, Transaction, UserProfile, AdminAccount } from '../types';
 import { translations } from '../i18n/translations';
 import { api } from '../services/api';
 import { initialCryptoRates, initialUser } from '../services/mockData';
@@ -19,6 +19,10 @@ interface AppContextType {
   setCurrentPortal: (portal: 'user' | 'admin') => void;
   isAdminUnlocked: boolean;
   setIsAdminUnlocked: (unlocked: boolean) => void;
+  currentAdmin: AdminAccount | null;
+  setCurrentAdmin: (admin: AdminAccount | null) => void;
+  isMasterAdmin: boolean;
+  activeAdminPermissions: string[];
   lockAdminSession: () => void;
   isAdminAuthModalOpen: boolean;
   setIsAdminAuthModalOpen: (open: boolean) => void;
@@ -31,9 +35,18 @@ interface AppContextType {
   vietQrConfig: any;
   refreshVietQrConfig: () => Promise<void>;
   notifications: InAppNotification[];
+  userNotifications: InAppNotification[];
+  adminNotifications: InAppNotification[];
   unreadCount: number;
-  markNotificationsAsRead: () => void;
-  addNotification: (type: InAppNotification['type'], title: string, message: string, linkId?: string) => void;
+  unreadAdminCount: number;
+  markNotificationsAsRead: (scope?: 'user' | 'admin') => void;
+  addNotification: (
+    type: InAppNotification['type'], 
+    title: string, 
+    message: string, 
+    linkId?: string, 
+    target?: 'user' | 'admin' | 'both'
+  ) => void;
   activeOrder: Transaction | null;
   setActiveOrder: (order: Transaction | null) => void;
   isStripeModalOpen: boolean;
@@ -61,9 +74,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeTab, setActiveTab] = useState<'exchange' | 'market' | 'history' | 'profile' | 'kyc' | 'security' | 'admin'>('exchange');
   const [currentPortal, setCurrentPortal] = useState<'user' | 'admin'>('user');
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
   const [isUserAuthModalOpen, setIsUserAuthModalOpen] = useState<boolean>(false);
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(false);
   const [vietQrConfig, setVietQrConfig] = useState<any>(null);
 
   // Modals state
@@ -75,23 +89,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isKYCModalOpen, setIsKYCModalOpen] = useState(false);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
 
-  // In-app Push Notifications
-  const [notifications, setNotifications] = useState<InAppNotification[]>([
+  // In-app User Notifications
+  const [userNotifications, setUserNotifications] = useState<InAppNotification[]>([
     {
-      id: 'notif-1',
+      id: 'notif-user-1',
       type: 'security_alert',
       title: 'Bảo mật tài khoản',
       message: 'Tính năng đăng nhập sinh trắc học và 2FA đã sẵn sàng kích hoạt.',
       timestamp: new Date(Date.now() - 3600000).toISOString(),
-      read: false
+      read: false,
+      target: 'user'
     },
     {
-      id: 'notif-2',
+      id: 'notif-user-2',
       type: 'kyc_update',
       title: 'Hạn mức KYC',
       message: 'Bạn đang ở Cấp 1 (Cơ bản). Hạn mức mua crypto là 10.000.000 ₫/tháng.',
       timestamp: new Date(Date.now() - 7200000).toISOString(),
-      read: false
+      read: false,
+      target: 'user'
+    }
+  ]);
+
+  // Admin Operational Notifications
+  const [adminNotifications, setAdminNotifications] = useState<InAppNotification[]>([
+    {
+      id: 'notif-admin-1',
+      type: 'admin_action',
+      title: 'Khởi tạo Bàn Làm Việc Quản Trị',
+      message: 'Hệ thống phân quyền RBAC và kiểm soát rủi ro OTC đã được đồng bộ an toàn.',
+      timestamp: new Date(Date.now() - 1800000).toISOString(),
+      read: false,
+      target: 'admin'
     }
   ]);
 
@@ -102,14 +131,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshUser = async () => {
     try {
       const data = await api.getUserProfile();
-      if (data?.user) {
+      if (data?.user && data.user.id && data.user.email) {
         setUser(data.user);
+        setIsUserLoggedIn(true);
+      } else {
+        setUser(initialUser);
+        setIsUserLoggedIn(false);
       }
       if (data?.vietQrConfig) {
         setVietQrConfig(data.vietQrConfig);
       }
     } catch (e) {
       console.warn('Failed to refresh user:', e);
+      setUser(initialUser);
+      setIsUserLoggedIn(false);
     }
   };
 
@@ -190,21 +225,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => clearInterval(interval);
   }, []);
 
-  const addNotification = (type: InAppNotification['type'], title: string, message: string, linkId?: string) => {
+  const addNotification = (
+    type: InAppNotification['type'], 
+    title: string, 
+    message: string, 
+    linkId?: string,
+    target?: 'user' | 'admin' | 'both'
+  ) => {
+    const determinedTarget = target || (currentPortal === 'admin' ? 'admin' : 'user');
     const newNotif: InAppNotification = {
-      id: `notif-${Date.now()}`,
+      id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       type,
       title,
       message,
       timestamp: new Date().toISOString(),
       read: false,
-      linkId
+      linkId,
+      target: determinedTarget
     };
-    setNotifications(prev => [newNotif, ...prev]);
+
+    if (determinedTarget === 'user' || determinedTarget === 'both') {
+      setUserNotifications(prev => [newNotif, ...prev]);
+    }
+    if (determinedTarget === 'admin' || determinedTarget === 'both') {
+      setAdminNotifications(prev => [newNotif, ...prev]);
+    }
   };
 
-  const markNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markNotificationsAsRead = (scope?: 'user' | 'admin') => {
+    const targetScope = scope || (currentPortal === 'admin' ? 'admin' : 'user');
+    if (targetScope === 'user') {
+      setUserNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } else {
+      setAdminNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }
   };
 
   const updateUserBalance = (cryptoSymbol: string, amount: number) => {
@@ -220,11 +274,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = userNotifications.filter(n => !n.read).length;
+  const unreadAdminCount = adminNotifications.filter(n => !n.read).length;
+
+  const isMasterAdmin = currentAdmin?.isMaster ?? false;
+  const activeAdminPermissions = currentAdmin?.permissions || (isAdminUnlocked ? ['admin_users', 'transaction_management', 'wallet_management', 'payment_management', 'vietqr_config', 'stats_overview', 'kyc_review', 'market_management', 'system_settings', 'admin_management'] : []);
 
   const lockAdminSession = () => {
     setIsAdminUnlocked(false);
+    setCurrentAdmin(null);
     setActiveTab('exchange');
+    setCurrentPortal('user');
   };
 
   return (
@@ -244,6 +304,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentPortal,
         isAdminUnlocked,
         setIsAdminUnlocked,
+        currentAdmin,
+        setCurrentAdmin,
+        isMasterAdmin,
+        activeAdminPermissions,
         lockAdminSession,
         isAdminAuthModalOpen,
         setIsAdminAuthModalOpen,
@@ -255,8 +319,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logoutUserAccount,
         vietQrConfig,
         refreshVietQrConfig,
-        notifications,
+        notifications: userNotifications,
+        userNotifications,
+        adminNotifications,
         unreadCount,
+        unreadAdminCount,
         markNotificationsAsRead,
         addNotification,
         activeOrder,

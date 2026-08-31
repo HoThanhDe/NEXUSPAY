@@ -8,7 +8,8 @@ import {
   AlertCircle, 
   Sparkles,
   Smartphone,
-  ChevronRight
+  ChevronRight,
+  Fuel
 } from 'lucide-react';
 import confetti from '../../utils/confetti';
 import { useApp } from '../../context/AppContext';
@@ -182,6 +183,36 @@ export const StripePaymentModal: React.FC = () => {
                 <span className="text-sm font-bold font-mono text-cyan-400">
                   {activeOrder.totalVND.toLocaleString('vi-VN')} ₫
                 </span>
+              </div>
+            </div>
+
+            {/* Transparent Cost Breakdown Strip */}
+            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs space-y-1.5 shadow-inner">
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Tiền mua Token:</span>
+                <span className="font-mono text-slate-200">{(activeOrder.fiatAmount || (activeOrder.totalVND - (activeOrder.networkFeeVND || 0) - (activeOrder.gatewayFeeVND || 0))).toLocaleString('vi-VN')} ₫</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="flex items-center space-x-1">
+                  <Fuel className="w-3 h-3 text-cyan-400" />
+                  <span>Phí mạng lưới ({activeOrder.network}):</span>
+                </span>
+                {activeOrder.networkFeeVND === 0 ? (
+                  <span className="font-mono text-emerald-400 font-bold flex items-center space-x-1">
+                    <span>0 ₫</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                      ✨ Miễn phí 0₫
+                    </span>
+                  </span>
+                ) : (
+                  <span className="font-mono text-amber-400 font-medium">
+                    {(activeOrder.networkFeeVND || 0).toLocaleString('vi-VN')} ₫
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Phí thẻ Stripe (1%):</span>
+                <span className="font-mono text-slate-200">{(activeOrder.gatewayFeeVND || 0).toLocaleString('vi-VN')} ₫</span>
               </div>
             </div>
 

@@ -166,30 +166,24 @@ export const initialCryptoRates: CryptoRate[] = [
 ];
 
 export const initialUser: UserProfile = {
-  id: 'usr_vn_9988',
-  name: 'Nguyễn Văn An',
-  email: 'deho.20032021@gmail.com',
-  phone: '+84 987 654 321',
-  kycTier: 'tier1_basic',
-  kycStatus: 'verified',
-  monthlyLimitVND: 10000000, // 10 Million VND for Basic KYC
-  monthlyUsedVND: 2542000,
+  id: '',
+  name: '',
+  email: '',
+  phone: '',
+  kycTier: 'tier0_unverified',
+  kycStatus: 'unsubmitted',
+  monthlyLimitVND: 0,
+  monthlyUsedVND: 0,
   walletBalance: {
-    VND: 4500000,
-    USDT: 150.25,
-    BTC: 0.0042,
-    ETH: 0.085,
-    SOL: 1.45,
+    VND: 0,
+    USDT: 0,
+    BTC: 0,
+    ETH: 0,
+    SOL: 0,
   },
-  bankAccount: {
-    bankName: 'Vietcombank (VCB)',
-    bankShort: 'VCB',
-    accountNumber: '10188992233',
-    accountName: 'NGUYEN VAN AN'
-  },
-  twoFactorEnabled: true,
-  biometricsEnabled: true,
-  registeredAt: new Date(Date.now() - 30 * 86400000).toISOString()
+  twoFactorEnabled: false,
+  biometricsEnabled: false,
+  registeredAt: ''
 };
 
 export const initialSystemWallets: SystemWallet[] = [
@@ -271,9 +265,9 @@ export const sampleTransactions: Transaction[] = [
   {
     id: 'TXN-9481-VND',
     userId: 'usr_vn_9988',
-    userEmail: 'deho.20032021@gmail.com',
-    userName: 'Nguyễn Văn An',
-    fullName: 'NGUYỄN VĂN AN',
+    userEmail: 'trader.otc@nexus.vn',
+    userName: 'Trần Quang Huy',
+    fullName: 'TRẦN QUANG HUY',
     phone: '0987654321',
     type: 'buy_crypto',
     fiatAmount: 2607000,
@@ -307,9 +301,9 @@ export const sampleTransactions: Transaction[] = [
   {
     id: 'TXN-9480-VND',
     userId: 'usr_vn_9988',
-    userEmail: 'deho.20032021@gmail.com',
-    userName: 'Nguyễn Văn An',
-    fullName: 'NGUYỄN VĂN AN',
+    userEmail: 'trader.otc@nexus.vn',
+    userName: 'Trần Quang Huy',
+    fullName: 'TRẦN QUANG HUY',
     phone: '0987654321',
     type: 'sell_crypto',
     fiatAmount: 2457000,
@@ -501,13 +495,13 @@ export const samplePaymentPayouts: PaymentPayoutRecord[] = [
   {
     id: 'PAY-9480',
     transactionId: 'TXN-9480-VND',
-    customerName: 'NGUYỄN VĂN AN',
-    customerEmail: 'deho.20032021@gmail.com',
+    customerName: 'TRẦN QUANG HUY',
+    customerEmail: 'trader.otc@nexus.vn',
     customerPhone: '0987654321',
     bankName: 'Vietcombank (VCB)',
     bankShort: 'VCB',
     accountNumber: '10188992233',
-    accountName: 'NGUYEN VAN AN',
+    accountName: 'TRAN QUANG HUY',
     amountVND: 2457000,
     transferMemo: 'NEXUS PAYOUT TXN-9480',
     receiptImageUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80',
@@ -595,14 +589,14 @@ export const sampleKycQueue: KYCSubmission[] = [
   {
     id: 'KYC-REQ-8809',
     userId: 'usr_vn_9988',
-    userEmail: 'deho.20032021@gmail.com',
-    userName: 'Nguyễn Văn An',
+    userEmail: 'trader.otc@nexus.vn',
+    userName: 'Trần Quang Huy',
     targetTier: 'tier1_basic',
     status: 'approved',
     submittedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     reviewedAt: new Date(Date.now() - 86400000 * 2 + 1800000).toISOString(),
     documentType: 'cccd',
-    fullName: 'NGUYỄN VĂN AN',
+    fullName: 'TRẦN QUANG HUY',
     idCardNumber: '001094018294',
     dateOfBirth: '1994-08-15',
     gender: 'Nam',

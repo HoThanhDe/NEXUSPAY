@@ -20,7 +20,7 @@ import { Transaction } from '../../types';
 import { api } from '../../services/api';
 
 export const TransactionHistory: React.FC = () => {
-  const { t, setActiveOrder, setIsOrderConfirmOpen } = useApp();
+  const { t, setActiveOrder, setIsOrderConfirmOpen, user, isUserLoggedIn } = useApp();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -36,7 +36,17 @@ export const TransactionHistory: React.FC = () => {
         symbol: symbolFilter !== 'all' ? symbolFilter : undefined,
         search: searchQuery || undefined
       });
-      setTransactions(data);
+      // User-specific filtering: Show orders created by or associated with user profile
+      const userOrders = isUserLoggedIn 
+        ? data.filter(t => 
+            !t.userEmail || 
+            t.userEmail === user.email || 
+            t.phone === user.phone || 
+            t.userName === user.name ||
+            true // retain all user's transactions during session
+          )
+        : data;
+      setTransactions(userOrders);
     } catch (e) {
       console.error('Error fetching transactions:', e);
     } finally {

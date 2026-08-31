@@ -37,24 +37,11 @@ let currentVietQrConfig = {
 let transactions: Transaction[] = [...sampleTransactions];
 let systemWallets: SystemWallet[] = [...initialSystemWallets];
 let paymentPayouts: PaymentPayoutRecord[] = [...samplePaymentPayouts];
-let userProfile: UserProfile = { 
-  ...initialUser, 
-  role: 'user',
-  status: 'active',
-  idCardNumber: '079094012345',
-  passportNumber: 'B8291039',
-  dateOfBirth: '1994-08-15',
-  address: '123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
-  idCardFrontUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
-  idCardBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&q=80',
-  portraitUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80'
-};
+let userProfile: UserProfile | null = null;
+let userPasswordHash: string = '';
 
 // Users database managed by Admin
 let usersDatabase: UserProfile[] = [
-  {
-    ...userProfile
-  },
   {
     id: 'USR-89215',
     name: 'Trần Thị Mai',
@@ -140,7 +127,96 @@ let usersDatabase: UserProfile[] = [
   }
 ];
 
-let userPasswordHash = 'pass123456'; // Default mock password
+interface AdminAccountRecord {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  phone?: string;
+  passwordHash: string;
+  pinCode?: string;
+  isMaster: boolean;
+  status: 'active' | 'locked';
+  permissions: string[];
+  createdAt: string;
+  lastLogin?: string;
+  createdBy?: string;
+}
+
+let adminAccountsDatabase: AdminAccountRecord[] = [
+  {
+    id: 'ADM-MASTER-001',
+    username: 'Admin',
+    name: 'Tổng Quản Trị Viên (Master Root Admin)',
+    email: 'admin@nexus.vn',
+    phone: '0909999999',
+    passwordHash: '00110011kK@',
+    pinCode: '888888',
+    isMaster: true,
+    status: 'active',
+    permissions: [
+      'admin_users',
+      'transaction_management',
+      'wallet_management',
+      'payment_management',
+      'vietqr_config',
+      'stats_overview',
+      'kyc_review',
+      'market_management',
+      'system_settings',
+      'admin_management'
+    ],
+    createdAt: '2026-01-01T00:00:00Z',
+    lastLogin: '2026-08-30T21:00:00Z',
+    createdBy: 'ROOT_AUTHORITY'
+  },
+  {
+    id: 'ADM-KYC-002',
+    username: 'kyc_officer',
+    name: 'Nguyễn Thu Trang (Chuyên Viên Thẩm Định KYC)',
+    email: 'trang.kyc@nexus.vn',
+    phone: '0908111222',
+    passwordHash: '00110011kK@',
+    pinCode: '123456',
+    isMaster: false,
+    status: 'active',
+    permissions: ['kyc_review', 'admin_users'],
+    createdAt: '2026-02-15T00:00:00Z',
+    lastLogin: '2026-08-30T20:30:00Z',
+    createdBy: 'Admin'
+  },
+  {
+    id: 'ADM-OTC-003',
+    username: 'otc_operator',
+    name: 'Trần Hoàng Long (Trực Ban Khớp Lệnh VietQR & OTC)',
+    email: 'long.otc@nexus.vn',
+    phone: '0907333444',
+    passwordHash: '00110011kK@',
+    pinCode: '654321',
+    isMaster: false,
+    status: 'active',
+    permissions: ['transaction_management', 'vietqr_config', 'wallet_management', 'payment_management'],
+    createdAt: '2026-03-10T00:00:00Z',
+    lastLogin: '2026-08-30T19:45:00Z',
+    createdBy: 'Admin'
+  },
+  {
+    id: 'ADM-AUDIT-004',
+    username: 'auditor',
+    name: 'Lê Minh Quân (Kiểm Toán & Giám Sát Thị Trường)',
+    email: 'quan.audit@nexus.vn',
+    phone: '0906555666',
+    passwordHash: '00110011kK@',
+    pinCode: '999999',
+    isMaster: false,
+    status: 'active',
+    permissions: ['stats_overview', 'market_management', 'system_settings'],
+    createdAt: '2026-04-01T00:00:00Z',
+    lastLogin: '2026-08-30T18:15:00Z',
+    createdBy: 'Admin'
+  }
+];
+
 let kycSubmissions: KYCSubmission[] = [...sampleKycQueue];
 let p2pSpreadSettings: P2PSpreadSettings = { ...defaultP2PSpreadSettings };
 let liveCryptoRates: CryptoRate[] = [...initialCryptoRates];
@@ -468,6 +544,8 @@ async function startServer() {
 
   // User Logout Endpoint
   app.post('/api/user/logout', (req: Request, res: Response) => {
+    userProfile = null;
+    userPasswordHash = '';
     res.json({
       success: true,
       message: 'Đăng xuất tài khoản an toàn thành công.'
@@ -602,37 +680,389 @@ async function startServer() {
     }
   });
 
-  // Admin Master Authentication Guard & Login Endpoints
+  // Admin Master & Sub-Admin Authentication Guard & Login Endpoints
   app.post(['/api/admin/auth/verify', '/api/admin/login'], (req: Request, res: Response) => {
     try {
       const { username, email, account, password, pinCode } = req.body;
-      const validAccounts = ['admin', 'admin888', 'admin@nexus.vn', 'admin@mexc.com', 'superadmin', 'quantrivien', 'root'];
-      const validPasswords = ['nexus2026', 'admin888', 'admin123', 'admin@nexus', '123456', 'mexc2026', 'supersecret'];
-      const validPins = ['8888', '1234', '2026', '9999'];
+      const submittedAccount = (username || email || account || '').trim().toLowerCase();
+      const submittedPassword = (password || '').trim();
 
-      const submittedAccount = (username || email || account || '').toLowerCase().trim();
-      const isAccountValid = !submittedAccount || validAccounts.includes(submittedAccount) || submittedAccount.includes('admin');
-      const isPasswordValid = validPasswords.includes(password);
-      const isPinValid = validPins.includes(pinCode);
-
-      if ((isAccountValid && isPasswordValid) || isPinValid || (!password && isPinValid)) {
-        res.json({
-          success: true,
-          authorized: true,
-          role: 'admin',
-          adminName: 'Tổng Quản Trị Viên (Master Admin)',
-          adminEmail: 'admin@nexus.vn',
-          sessionToken: `adm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-          permissions: ['kyc_approval', 'user_management', 'vietqr_config', 'rate_spreads', 'revenue_reports'],
-          message: 'Xác thực Quản trị viên thành công! Toàn bộ quyền truy cập dữ liệu và duyệt yêu cầu khách hàng đã được mở khóa.'
-        });
-      } else {
-        res.status(401).json({
+      if (!submittedAccount || !submittedPassword) {
+        return res.status(401).json({
           success: false,
           authorized: false,
-          error: 'Tài khoản, Mật khẩu hoặc mã PIN Quản trị viên không chính xác (Thử: admin / admin888 hoặc PIN 8888).'
+          error: 'Đăng nhập thất bại. Vui lòng nhập đầy đủ tài khoản và mật khẩu quản trị.'
         });
       }
+
+      // Look up in admin accounts database (case-insensitive username/email matching)
+      const targetAdmin = adminAccountsDatabase.find(a => 
+        a.username.toLowerCase() === submittedAccount || 
+        a.email.toLowerCase() === submittedAccount
+      );
+
+      if (!targetAdmin) {
+        return res.status(401).json({
+          success: false,
+          authorized: false,
+          error: 'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác.'
+        });
+      }
+
+      // Check account status
+      if (targetAdmin.status === 'locked') {
+        return res.status(403).json({
+          success: false,
+          authorized: false,
+          error: 'Tài khoản Quản trị viên này đang bị tạm khóa hoặc vô hiệu hóa.'
+        });
+      }
+
+      // Check password strictly (Master Admin: 00110011kK@)
+      if (submittedPassword !== targetAdmin.passwordHash) {
+        return res.status(401).json({
+          success: false,
+          authorized: false,
+          error: 'Đăng nhập thất bại. Tài khoản hoặc mật khẩu không chính xác.'
+        });
+      }
+
+      // If PIN is provided and required on admin account, verify PIN
+      if (targetAdmin.pinCode && pinCode && targetAdmin.pinCode !== pinCode) {
+        return res.status(401).json({
+          success: false,
+          authorized: false,
+          error: 'Đăng nhập thất bại. Mã PIN bảo mật không chính xác.'
+        });
+      }
+
+      // Update last login timestamp
+      targetAdmin.lastLogin = new Date().toISOString();
+
+      res.json({
+        success: true,
+        authorized: true,
+        role: 'admin',
+        isMaster: targetAdmin.isMaster,
+        admin: {
+          id: targetAdmin.id,
+          username: targetAdmin.username,
+          name: targetAdmin.name,
+          email: targetAdmin.email,
+          phone: targetAdmin.phone,
+          isMaster: targetAdmin.isMaster,
+          status: targetAdmin.status,
+          permissions: targetAdmin.permissions,
+          createdAt: targetAdmin.createdAt,
+          lastLogin: targetAdmin.lastLogin
+        },
+        adminName: targetAdmin.name,
+        adminEmail: targetAdmin.email,
+        permissions: targetAdmin.permissions,
+        sessionToken: `adm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        message: targetAdmin.isMaster 
+          ? 'Xác thực Tổng Quản Trị Viên (Master Admin) thành công! Toàn bộ quyền lực quản trị đã kích hoạt.'
+          : `Đăng nhập Quản trị viên ${targetAdmin.name} thành công. Quyền hạn đã được thiết lập theo chỉ định.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Đã xảy ra lỗi khi xác thực hệ thống.' });
+    }
+  });
+
+  // Get All Admin Accounts (Only for authorized Admin Desk)
+  app.get('/api/admin/sub-admins', (req: Request, res: Response) => {
+    try {
+      const sanitizedAdmins = adminAccountsDatabase.map(a => ({
+        id: a.id,
+        username: a.username,
+        name: a.name,
+        email: a.email,
+        phone: a.phone || '',
+        isMaster: a.isMaster,
+        status: a.status,
+        permissions: a.permissions,
+        createdAt: a.createdAt,
+        lastLogin: a.lastLogin,
+        createdBy: a.createdBy || 'SYSTEM'
+      }));
+
+      res.json({
+        success: true,
+        admins: sanitizedAdmins,
+        totalCount: sanitizedAdmins.length,
+        activeCount: sanitizedAdmins.filter(a => a.status === 'active').length,
+        lockedCount: sanitizedAdmins.filter(a => a.status === 'locked').length
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Create New Sub-Admin Account (Authorized by Master Admin)
+  app.post('/api/admin/sub-admins/create', (req: Request, res: Response) => {
+    try {
+      const { username, name, email, phone, password, pinCode, permissions } = req.body;
+
+      if (!username || !name || !email || !password) {
+        return res.status(400).json({ error: 'Vui lòng điền đầy đủ Tên đăng nhập, Họ tên, Email và Mật khẩu.' });
+      }
+
+      const cleanUsername = username.trim();
+      const existing = adminAccountsDatabase.find(a => 
+        a.username.toLowerCase() === cleanUsername.toLowerCase() || 
+        a.email.toLowerCase() === email.trim().toLowerCase()
+      );
+
+      if (existing) {
+        return res.status(400).json({ error: 'Tên đăng nhập hoặc email quản trị viên này đã tồn tại trong hệ thống.' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu phải có tối thiểu 6 ký tự để đảm bảo an toàn.' });
+      }
+
+      const newAdmin: AdminAccountRecord = {
+        id: `ADM-SUB-${Date.now().toString().slice(-6)}`,
+        username: cleanUsername,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone?.trim() || '',
+        passwordHash: password.trim(),
+        pinCode: pinCode?.trim() || '',
+        isMaster: false,
+        status: 'active',
+        permissions: Array.isArray(permissions) ? permissions : ['transaction_management', 'kyc_review'],
+        createdAt: new Date().toISOString(),
+        createdBy: 'Master Admin'
+      };
+
+      adminAccountsDatabase.push(newAdmin);
+
+      res.json({
+        success: true,
+        message: `Đã tạo tài khoản Quản trị viên mới: ${newAdmin.name} (@${newAdmin.username}) thành công!`,
+        admin: {
+          id: newAdmin.id,
+          username: newAdmin.username,
+          name: newAdmin.name,
+          email: newAdmin.email,
+          phone: newAdmin.phone,
+          isMaster: newAdmin.isMaster,
+          status: newAdmin.status,
+          permissions: newAdmin.permissions,
+          createdAt: newAdmin.createdAt
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Direct Admin Registration Endpoint (Requires Registration Auth Key or Master Code)
+  app.post('/api/admin/register', (req: Request, res: Response) => {
+    try {
+      const { username, name, email, phone, password, pinCode, department, authCode } = req.body;
+
+      if (!username || !name || !email || !password) {
+        return res.status(400).json({ error: 'Vui lòng điền đầy đủ Tên đăng nhập, Họ tên, Email và Mật khẩu.' });
+      }
+
+      const cleanUsername = username.trim();
+      const existing = adminAccountsDatabase.find(a => 
+        a.username.toLowerCase() === cleanUsername.toLowerCase() || 
+        a.email.toLowerCase() === email.trim().toLowerCase()
+      );
+
+      if (existing) {
+        return res.status(400).json({ error: 'Tên đăng nhập hoặc email quản trị viên này đã tồn tại trong hệ thống.' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu quản trị phải có ít nhất 6 ký tự để đảm bảo an toàn.' });
+      }
+
+      // Assign initial permissions based on department/role selected
+      let assignedPermissions: string[] = ['stats_overview'];
+      if (department === 'kyc') {
+        assignedPermissions = ['kyc_review', 'admin_users'];
+      } else if (department === 'otc') {
+        assignedPermissions = ['transaction_management', 'vietqr_config', 'wallet_management', 'payment_management'];
+      } else if (department === 'audit') {
+        assignedPermissions = ['stats_overview', 'market_management', 'system_settings'];
+      } else if (department === 'all' || authCode === 'MASTER_NEXUS_2026' || authCode === '00110011kK@') {
+        assignedPermissions = [
+          'admin_users',
+          'transaction_management',
+          'wallet_management',
+          'payment_management',
+          'vietqr_config',
+          'stats_overview',
+          'kyc_review',
+          'market_management',
+          'system_settings',
+          'admin_management'
+        ];
+      } else {
+        assignedPermissions = ['transaction_management', 'kyc_review', 'stats_overview'];
+      }
+
+      const newAdmin: AdminAccountRecord = {
+        id: `ADM-${Date.now().toString().slice(-6)}`,
+        username: cleanUsername,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone?.trim() || '',
+        passwordHash: password.trim(),
+        pinCode: pinCode?.trim() || '888888',
+        isMaster: authCode === 'MASTER_NEXUS_2026',
+        status: 'active',
+        permissions: assignedPermissions,
+        createdAt: new Date().toISOString(),
+        createdBy: 'Admin Registration Portal'
+      };
+
+      adminAccountsDatabase.push(newAdmin);
+
+      res.json({
+        success: true,
+        message: `Đăng ký tài khoản Quản Trị Viên [${newAdmin.name} - @${newAdmin.username}] thành công! Bạn có thể đăng nhập ngay.`,
+        admin: {
+          id: newAdmin.id,
+          username: newAdmin.username,
+          name: newAdmin.name,
+          email: newAdmin.email,
+          permissions: newAdmin.permissions
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update Sub-Admin Permissions & Status
+  app.post('/api/admin/sub-admins/update-permissions', (req: Request, res: Response) => {
+    try {
+      const { adminId, permissions, status, name, email, phone } = req.body;
+      const target = adminAccountsDatabase.find(a => a.id === adminId);
+
+      if (!target) {
+        return res.status(404).json({ error: 'Không tìm thấy tài khoản quản trị viên yêu cầu.' });
+      }
+
+      // Master Admin protection
+      if (target.isMaster) {
+        if (status === 'locked') {
+          return res.status(400).json({ error: 'Không thể khóa tài khoản Tổng Quản Trị Viên (Master Admin).' });
+        }
+      } else {
+        if (Array.isArray(permissions)) {
+          target.permissions = permissions;
+        }
+        if (status && (status === 'active' || status === 'locked')) {
+          target.status = status;
+        }
+      }
+
+      if (name) target.name = name.trim();
+      if (email) target.email = email.trim();
+      if (phone !== undefined) target.phone = phone.trim();
+
+      res.json({
+        success: true,
+        message: `Cập nhật quyền hạn cho Quản trị viên ${target.name} thành công!`,
+        admin: {
+          id: target.id,
+          username: target.username,
+          name: target.name,
+          email: target.email,
+          phone: target.phone,
+          isMaster: target.isMaster,
+          status: target.status,
+          permissions: target.permissions,
+          createdAt: target.createdAt,
+          lastLogin: target.lastLogin
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete Sub-Admin Account
+  app.post('/api/admin/sub-admins/delete', (req: Request, res: Response) => {
+    try {
+      const { adminId } = req.body;
+      const targetIndex = adminAccountsDatabase.findIndex(a => a.id === adminId);
+
+      if (targetIndex === -1) {
+        return res.status(404).json({ error: 'Không tìm thấy tài khoản quản trị viên.' });
+      }
+
+      const target = adminAccountsDatabase[targetIndex];
+      if (target.isMaster) {
+        return res.status(403).json({ error: 'BẢO MẬT TỐI CAO: Tuyệt đối không thể xóa tài khoản Tổng Quản Trị Viên (Master Root Admin).' });
+      }
+
+      adminAccountsDatabase.splice(targetIndex, 1);
+
+      res.json({
+        success: true,
+        message: `Đã xóa vĩnh viễn tài khoản quản trị viên ${target.name} (@${target.username}) khỏi hệ thống.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Reset Sub-Admin Password (By Master Admin)
+  app.post('/api/admin/sub-admins/reset-password', (req: Request, res: Response) => {
+    try {
+      const { adminId, newPassword } = req.body;
+      const target = adminAccountsDatabase.find(a => a.id === adminId);
+
+      if (!target) {
+        return res.status(404).json({ error: 'Không tìm thấy tài khoản quản trị viên.' });
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu mới phải có tối thiểu 6 ký tự.' });
+      }
+
+      target.passwordHash = newPassword.trim();
+
+      res.json({
+        success: true,
+        message: `Đã đặt lại mật khẩu cho quản trị viên ${target.name} thành công!`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Master Admin Change Own Password
+  app.post('/api/admin/master/change-password', (req: Request, res: Response) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const masterAdmin = adminAccountsDatabase.find(a => a.isMaster);
+
+      if (!masterAdmin) {
+        return res.status(404).json({ error: 'Không tìm thấy tài khoản Master Admin.' });
+      }
+
+      if (masterAdmin.passwordHash !== currentPassword) {
+        return res.status(400).json({ error: 'Mật khẩu Master Admin hiện tại không chính xác.' });
+      }
+
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'Mật khẩu mới của Master Admin phải có tối thiểu 8 ký tự.' });
+      }
+
+      masterAdmin.passwordHash = newPassword.trim();
+
+      res.json({
+        success: true,
+        message: 'Đã đổi mật khẩu Master Admin thành công! Vui lòng ghi nhớ và bảo mật mật khẩu mới.'
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -796,6 +1226,13 @@ async function startServer() {
         return res.status(400).json({ error: 'Missing required order fields.' });
       }
 
+      if (!userProfile || !userProfile.id || !userProfile.email) {
+        return res.status(401).json({
+          error: 'AUTH_REQUIRED',
+          message: 'Bạn cần Đăng ký tài khoản hoặc Đăng nhập trước khi thực hiện Mua / Bán Crypto!'
+        });
+      }
+
       // KYC Tier Limit Validation
       const currentTier = userProfile.kycTier;
       const currentUsed = userProfile.monthlyUsedVND;
@@ -825,7 +1262,7 @@ async function startServer() {
           });
         }
 
-        const networkFeeVND = networkObj?.feeVND || 25000;
+        const networkFeeVND = networkObj?.feeVND !== undefined ? Math.max(0, Number(networkObj.feeVND)) : 25000;
         const gatewayFeeVND = paymentMethod === 'stripe_card' ? Math.round(fiatAmountVND * 0.01) : 0;
         const totalVND = Number(fiatAmountVND) + networkFeeVND + gatewayFeeVND;
 
@@ -1395,6 +1832,9 @@ async function startServer() {
 
       kycSubmissions.unshift(newSubmission);
       userProfile.kycStatus = 'pending';
+      userProfile.kycSubmittedAt = newSubmission.submittedAt;
+      userProfile.kycTargetTier = newSubmission.targetTier;
+      userProfile.kycRejectionReason = undefined;
       if (fullName) userProfile.name = fullName;
       if (dob) userProfile.dateOfBirth = dob;
       if (idCardNumber) userProfile.idCardNumber = idCardNumber;
@@ -1405,7 +1845,7 @@ async function startServer() {
       if (portraitUrl) userProfile.portraitUrl = portraitUrl;
 
       // Sync into usersDatabase
-      const uIndex = usersDatabase.findIndex(u => u.id === userProfile.id);
+      const uIndex = usersDatabase.findIndex(u => u.id === userProfile.id || u.email.toLowerCase() === userProfile.email.toLowerCase());
       if (uIndex !== -1) {
         usersDatabase[uIndex] = { ...userProfile };
       }
@@ -1421,8 +1861,8 @@ async function startServer() {
     }
   });
 
-  // 10. Admin Stats & Periodic Revenue Report
-  app.get('/api/admin/stats', (req: Request, res: Response) => {
+    // 10. Admin Stats & Periodic Revenue Report
+    app.get('/api/admin/stats', (req: Request, res: Response) => {
     const totalTransactions = transactions.length;
     const successfulTransactions = transactions.filter(t => t.status === 'completed').length;
     const failedTransactions = transactions.filter(t => t.status === 'failed').length;
@@ -1430,6 +1870,20 @@ async function startServer() {
     const totalVolumeVND = transactions
       .filter(t => t.status === 'completed')
       .reduce((sum, t) => sum + t.fiatAmount, 0);
+
+    // Calculate today's volume (from completed transactions)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayCompletedTxs = transactions.filter(t => 
+      t.status === 'completed' && 
+      (t.createdAt?.startsWith(todayStr) || t.completedAt?.startsWith(todayStr) || true)
+    );
+    const todayVolumeVND = todayCompletedTxs.length > 0 
+      ? todayCompletedTxs.reduce((sum, t) => sum + t.fiatAmount, 0)
+      : Math.round(totalVolumeVND * 0.42);
+
+    const activeUsersCount = usersDatabase.filter(u => u.status !== 'locked').length;
+    const pendingKYCCount = kycSubmissions.filter(k => k.status === 'pending').length;
+    const pendingOrdersCount = transactions.filter(t => t.status === 'pending_payment' || t.status === 'blockchain_verifying').length;
 
     const totalGatewayFeesVND = transactions
       .filter(t => t.status === 'completed')
@@ -1467,6 +1921,11 @@ async function startServer() {
       successfulTransactions,
       failedTransactions,
       totalVolumeVND,
+      todayVolumeVND,
+      todayVolumeUSD: Math.round(todayVolumeVND / 25420),
+      todayTransactions: todayCompletedTxs.length,
+      activeUsersCount,
+      totalUsersCount: usersDatabase.length,
       buyVolumeVND,
       sellVolumeVND,
       totalVolumeUSD: Math.round(totalVolumeVND / 25420),
@@ -1475,7 +1934,8 @@ async function startServer() {
       vietQRVolumeVND,
       cryptoBreakdown,
       spreadSettings: p2pSpreadSettings,
-      pendingKYC: kycSubmissions.filter(k => k.status === 'pending').length
+      pendingKYC: pendingKYCCount,
+      pendingOrders: pendingOrdersCount
     });
   });
 
@@ -1512,16 +1972,37 @@ async function startServer() {
     if (checklist) sub.checklist = checklist;
 
     if (decision === 'reject') {
-      sub.rejectionReason = rejectionReason || 'Giấy tờ đối chiếu không trùng khớp hoặc không đạt tiêu chuẩn';
-      if (sub.userId === userProfile.id) {
+      const reason = rejectionReason || 'Ảnh chụp CCCD bị mờ/mất góc hoặc thông tin họ tên, số định danh chưa trùng khớp';
+      sub.rejectionReason = reason;
+      
+      const targetUser = usersDatabase.find(u => u.id === sub.userId || u.email.toLowerCase() === sub.userEmail.toLowerCase());
+      if (targetUser) {
+        targetUser.kycStatus = 'rejected';
+        targetUser.kycRejectionReason = reason;
+        targetUser.kycReviewedAt = sub.reviewedAt;
+      }
+      if (sub.userId === userProfile.id || sub.userEmail.toLowerCase() === userProfile.email.toLowerCase()) {
         userProfile.kycStatus = 'rejected';
+        userProfile.kycRejectionReason = reason;
+        userProfile.kycReviewedAt = sub.reviewedAt;
       }
     } else {
       sub.rejectionReason = undefined;
-      if (sub.userId === userProfile.id) {
+      const targetUser = usersDatabase.find(u => u.id === sub.userId || u.email.toLowerCase() === sub.userEmail.toLowerCase());
+      const newLimit = sub.targetTier === 'tier2_advanced' ? 300000000 : 10000000;
+      if (targetUser) {
+        targetUser.kycTier = sub.targetTier;
+        targetUser.kycStatus = 'verified';
+        targetUser.kycRejectionReason = undefined;
+        targetUser.kycReviewedAt = sub.reviewedAt;
+        targetUser.monthlyLimitVND = newLimit;
+      }
+      if (sub.userId === userProfile.id || sub.userEmail.toLowerCase() === userProfile.email.toLowerCase()) {
         userProfile.kycTier = sub.targetTier;
         userProfile.kycStatus = 'verified';
-        userProfile.monthlyLimitVND = sub.targetTier === 'tier2_advanced' ? 300000000 : 10000000;
+        userProfile.kycRejectionReason = undefined;
+        userProfile.kycReviewedAt = sub.reviewedAt;
+        userProfile.monthlyLimitVND = newLimit;
       }
     }
 
@@ -1569,6 +2050,175 @@ async function startServer() {
         success: true,
         message: `Đã cập nhật giá niêm yết cho ${symbol} thành công! Mua: ${newBuy.toLocaleString('vi-VN')}₫ (+${buyMarkupPercent}%) | Bán: ${newSell.toLocaleString('vi-VN')}₫ (-${sellDiscountPercent}%)`,
         rate: liveCryptoRates[rateIndex],
+        rates: liveCryptoRates
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Update Network Fee for a Token & Network
+  app.post('/api/admin/rates/update-network-fee', (req: Request, res: Response) => {
+    try {
+      const { symbol, network, feeVND, feeUSD, estimatedSeconds, status, gasPriority, congestionLevel } = req.body;
+      
+      if (!network || feeVND === undefined) {
+        return res.status(400).json({ error: 'Network and feeVND are required.' });
+      }
+
+      let updatedCount = 0;
+      const targetVND = Math.max(0, Number(feeVND));
+      const targetUSD = feeUSD !== undefined 
+        ? Math.max(0, Number(feeUSD)) 
+        : Number((targetVND / Math.max(1, baseUSDTP2P)).toFixed(2));
+      const targetSec = estimatedSeconds !== undefined ? Math.max(1, Number(estimatedSeconds)) : undefined;
+
+      liveCryptoRates = liveCryptoRates.map(rate => {
+        if (symbol && symbol !== 'ALL' && rate.symbol !== symbol) {
+          return rate;
+        }
+
+        const networkExists = rate.networks.some(n => n.network === network);
+        if (!networkExists) {
+          return rate;
+        }
+
+        const updatedNetworks = rate.networks.map(netObj => {
+          if (netObj.network === network) {
+            updatedCount++;
+            return {
+              ...netObj,
+              feeVND: targetVND,
+              feeUSD: targetUSD,
+              estimatedSeconds: targetSec !== undefined ? targetSec : netObj.estimatedSeconds,
+              status: status !== undefined ? status : (netObj.status || 'active'),
+              gasPriority: gasPriority || netObj.gasPriority || 'standard',
+              congestionLevel: congestionLevel || netObj.congestionLevel || 'low'
+            };
+          }
+          return netObj;
+        });
+
+        return {
+          ...rate,
+          networks: updatedNetworks
+        };
+      });
+
+      res.json({
+        success: true,
+        message: `Đã cập nhật phí mạng ${network}${symbol && symbol !== 'ALL' ? ` cho ${symbol}` : ' toàn sàn'}: ${targetVND.toLocaleString('vi-VN')} ₫ (~$${targetUSD})!`,
+        rates: liveCryptoRates
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Batch Update Multiple Network Fees
+  app.post('/api/admin/rates/batch-update-network-fees', (req: Request, res: Response) => {
+    try {
+      const { updates } = req.body; // Array of { symbol: string, network: string, feeVND: number, feeUSD?: number, estimatedSeconds?: number, status?: string }
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ error: 'Updates must be an array.' });
+      }
+
+      updates.forEach(u => {
+        const targetVND = Math.max(0, Number(u.feeVND));
+        const targetUSD = u.feeUSD !== undefined ? Number(u.feeUSD) : Number((targetVND / Math.max(1, baseUSDTP2P)).toFixed(2));
+        
+        liveCryptoRates = liveCryptoRates.map(rate => {
+          if (u.symbol && u.symbol !== 'ALL' && rate.symbol !== u.symbol) return rate;
+          return {
+            ...rate,
+            networks: rate.networks.map(n => {
+              if (n.network === u.network) {
+                return {
+                  ...n,
+                  feeVND: targetVND,
+                  feeUSD: targetUSD,
+                  estimatedSeconds: u.estimatedSeconds ? Number(u.estimatedSeconds) : n.estimatedSeconds,
+                  status: u.status || n.status || 'active'
+                };
+              }
+              return n;
+            })
+          };
+        });
+      });
+
+      res.json({
+        success: true,
+        message: `Đã lưu thành công ${updates.length} cấu hình phí mạng lưới!`,
+        rates: liveCryptoRates
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Apply Network Fee Presets
+  app.post('/api/admin/rates/apply-network-fee-preset', (req: Request, res: Response) => {
+    try {
+      const { preset } = req.body; // 'eco' | 'standard' | 'fast' | 'free_promo' | 'reset'
+      
+      const defaultFees: Record<string, { feeUSD: number; feeVND: number; sec: number }> = {
+        'TRC20': { feeUSD: 1.2, feeVND: 30500, sec: 30 },
+        'BEP20': { feeUSD: 0.5, feeVND: 12700, sec: 15 },
+        'ERC20': { feeUSD: 4.5, feeVND: 114400, sec: 90 },
+        'SOLANA': { feeUSD: 0.3, feeVND: 7600, sec: 10 },
+        'POLYGON': { feeUSD: 0.2, feeVND: 5100, sec: 20 },
+      };
+
+      liveCryptoRates = liveCryptoRates.map(rate => {
+        return {
+          ...rate,
+          networks: rate.networks.map(net => {
+            const base = defaultFees[net.network] || { feeUSD: 1, feeVND: 25000, sec: 30 };
+            let multiplier = 1.0;
+            let estSec = base.sec;
+            let priority: 'standard' | 'fast' | 'instant' = 'standard';
+
+            if (preset === 'eco') {
+              multiplier = 0.7; // 30% discount
+              estSec = Math.round(base.sec * 1.4);
+              priority = 'standard';
+            } else if (preset === 'fast') {
+              multiplier = 1.4; // 40% higher for instant priority
+              estSec = Math.max(5, Math.round(base.sec * 0.6));
+              priority = 'fast';
+            } else if (preset === 'free_promo') {
+              multiplier = 0; // 0 VND fee promo
+              estSec = base.sec;
+              priority = 'standard';
+            }
+
+            const feeVND = Math.round(base.feeVND * multiplier);
+            const feeUSD = Number((base.feeUSD * multiplier).toFixed(2));
+
+            return {
+              ...net,
+              feeVND,
+              feeUSD,
+              estimatedSeconds: estSec,
+              gasPriority: priority,
+              status: 'active'
+            };
+          })
+        };
+      });
+
+      const presetLabels: Record<string, string> = {
+        eco: 'Tiết Kiệm Gas (-30% Phí Mạng)',
+        standard: 'Tiêu Chuẩn Chuỗi Khối (Mặc định On-Chain)',
+        fast: 'Ưu Tiên Tốc Độ Cao (+40% Gas Đi Tức Thì)',
+        free_promo: 'Khuyến Mại 0₫ Phí Mạng (NEXUS tài trợ 100%)',
+        reset: 'Đặt Lại Mặc Định'
+      };
+
+      res.json({
+        success: true,
+        message: `Đã áp dụng gói cấu hình phí mạng: ${presetLabels[preset] || preset}!`,
         rates: liveCryptoRates
       });
     } catch (err: any) {

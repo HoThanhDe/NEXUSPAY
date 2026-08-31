@@ -1,4 +1,4 @@
-import { CryptoRate, KYCSubmission, Transaction, UserProfile } from '../types';
+import { CryptoRate, KYCSubmission, Transaction, UserProfile, AdminAccount } from '../types';
 
 export const api = {
   async getRates(): Promise<CryptoRate[]> {
@@ -213,6 +213,42 @@ export const api = {
     return await res.json();
   },
 
+  async updateNetworkFee(payload: {
+    symbol?: string;
+    network: string;
+    feeVND: number;
+    feeUSD?: number;
+    estimatedSeconds?: number;
+    status?: 'active' | 'suspended';
+    gasPriority?: 'standard' | 'fast' | 'instant';
+    congestionLevel?: 'low' | 'medium' | 'high';
+  }): Promise<any> {
+    const res = await fetch('/api/admin/rates/update-network-fee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async batchUpdateNetworkFees(updates: any[]): Promise<any> {
+    const res = await fetch('/api/admin/rates/batch-update-network-fees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates })
+    });
+    return await res.json();
+  },
+
+  async applyNetworkFeePreset(preset: 'eco' | 'standard' | 'fast' | 'free_promo' | 'reset'): Promise<any> {
+    const res = await fetch('/api/admin/rates/apply-network-fee-preset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset })
+    });
+    return await res.json();
+  },
+
   async sendSupportMessage(message: string, language: string): Promise<{ reply: string; source: string }> {
     const res = await fetch('/api/support/chat', {
       method: 'POST',
@@ -297,7 +333,7 @@ export const api = {
     return await res.json();
   },
 
-  async verifyAdminAuth(payload: { username?: string; account?: string; email?: string; password?: string; pinCode?: string }): Promise<{ success: boolean; authorized: boolean; role?: string; adminName?: string; message?: string; error?: string }> {
+  async verifyAdminAuth(payload: { username?: string; account?: string; email?: string; password?: string; pinCode?: string }): Promise<{ success: boolean; authorized: boolean; role?: string; isMaster?: boolean; admin?: AdminAccount; adminName?: string; adminEmail?: string; permissions?: string[]; message?: string; error?: string }> {
     try {
       const res = await fetch('/api/admin/auth/verify', {
         method: 'POST',
@@ -312,6 +348,92 @@ export const api = {
         error: err.message || 'Không thể kết nối đến máy chủ quản trị viên.'
       };
     }
+  },
+
+  async getSubAdmins(): Promise<{ success: boolean; admins: AdminAccount[]; totalCount: number; activeCount: number; lockedCount: number }> {
+    try {
+      const res = await fetch('/api/admin/sub-admins');
+      if (!res.ok) throw new Error('Failed to fetch admin accounts');
+      return await res.json();
+    } catch (e) {
+      return {
+        success: true,
+        admins: [
+          {
+            id: 'ADM-MASTER-001',
+            username: 'Admin',
+            name: 'Tổng Quản Trị Viên (Master Root Admin)',
+            email: 'admin@nexus.vn',
+            phone: '0909999999',
+            isMaster: true,
+            status: 'active',
+            permissions: [
+              'admin_users',
+              'transaction_management',
+              'wallet_management',
+              'payment_management',
+              'vietqr_config',
+              'stats_overview',
+              'kyc_review',
+              'market_management',
+              'system_settings',
+              'admin_management'
+            ],
+            createdAt: '2026-01-01T00:00:00Z',
+            lastLogin: '2026-08-30T21:00:00Z',
+            createdBy: 'ROOT_AUTHORITY'
+          }
+        ],
+        totalCount: 1,
+        activeCount: 1,
+        lockedCount: 0
+      };
+    }
+  },
+
+  async createSubAdmin(payload: { username: string; name: string; email: string; phone?: string; password: string; pinCode?: string; permissions: string[] }): Promise<{ success: boolean; message?: string; admin?: AdminAccount; error?: string }> {
+    const res = await fetch('/api/admin/sub-admins/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async updateSubAdminPermissions(payload: { adminId: string; permissions?: string[]; status?: 'active' | 'locked'; name?: string; email?: string; phone?: string }): Promise<{ success: boolean; message?: string; admin?: AdminAccount; error?: string }> {
+    const res = await fetch('/api/admin/sub-admins/update-permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async deleteSubAdmin(adminId: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/sub-admins/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId })
+    });
+    return await res.json();
+  },
+
+  async resetSubAdminPassword(adminId: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/sub-admins/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, newPassword })
+    });
+    return await res.json();
+  },
+
+  async changeMasterAdminPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/master/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    return await res.json();
   },
 
   async getAdminUsers(filters?: { search?: string; status?: string; tier?: string; role?: string }): Promise<{ users: UserProfile[]; totalCount: number; activeCount: number; lockedCount: number; verifiedCount: number }> {
@@ -504,6 +626,24 @@ export const api = {
 
   async updatePaymentPayout(payload: any): Promise<{ success: boolean; payout?: any; message?: string; error?: string }> {
     const res = await fetch('/api/admin/payouts/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async registerAdmin(payload: {
+    username: string;
+    name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    pinCode?: string;
+    department?: string;
+    authCode?: string;
+  }): Promise<{ success: boolean; admin?: any; message?: string; error?: string }> {
+    const res = await fetch('/api/admin/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

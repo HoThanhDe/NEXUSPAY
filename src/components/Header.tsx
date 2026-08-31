@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
+  ShieldAlert,
   Wallet, 
   Bell, 
   Globe, 
@@ -123,24 +124,33 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Top Status & Admin Portal Fast-Switch Button */}
+          {/* Right Top Status & Auth / Security Controls */}
           <div className="flex items-center space-x-2 shrink-0">
-            {/* Direct Switch to Admin Website Portal */}
+            {/* Dedicated Admin Portal Access Gateway */}
             <button
               type="button"
-              id="top-switch-admin-btn"
+              id="top-admin-portal-btn"
               onClick={handleSwitchToAdmin}
-              className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all shadow-sm ${
-                isAdminUnlocked
-                  ? 'bg-purple-950/80 hover:bg-purple-900 border border-purple-500/60 text-purple-200'
-                  : 'bg-slate-850 hover:bg-purple-950/60 border border-slate-750 hover:border-purple-500/40 text-slate-300 hover:text-purple-300'
-              }`}
-              title={isAdminUnlocked ? 'Vào Website Quản Trị Hệ Thống' : 'Đăng nhập vào Website Quản Trị Hệ Thống'}
+              className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all bg-purple-950/80 hover:bg-purple-900/90 text-purple-300 border border-purple-500/40 hover:border-purple-400 shadow-sm"
+              title="Cổng Đăng Nhập Quản Trị Viên (Admin Portal)"
             >
-              <LayoutDashboard className="w-3 h-3 text-purple-400" />
-              <span>{isAdminUnlocked ? 'Website Admin' : 'Cổng Admin'}</span>
-              <span className={`w-1.5 h-1.5 rounded-full ${isAdminUnlocked ? 'bg-emerald-400' : 'bg-purple-400'}`} />
+              <ShieldAlert className="w-3 h-3 text-purple-400" />
+              <span>{language === 'vi' ? 'Cổng Admin' : 'Admin Portal'}</span>
             </button>
+
+            {/* If NOT logged in: Show clean Login button. If logged in: Hide it completely! */}
+            {!isUserLoggedIn && (
+              <button
+                type="button"
+                id="top-login-btn"
+                onClick={() => setIsUserAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all bg-cyan-600/90 hover:bg-cyan-500 text-white shadow-sm"
+                title={t('login')}
+              >
+                <LogIn className="w-3 h-3 text-cyan-200" />
+                <span>{t('login')}</span>
+              </button>
+            )}
 
             {/* Quick 2FA / Passkey Status Pill on Desktop */}
             <button
@@ -224,14 +234,17 @@ export const Header: React.FC = () => {
             <span>{t('history')}</span>
           </button>
 
-          <button
-            id="nav-kyc-btn"
-            onClick={() => setIsKYCModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/20 transition-all"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t('kyc')}</span>
-          </button>
+          {/* Desktop Nav - KYC button only shown if NOT yet Tier 2 verified */}
+          {user.kycTier !== 'tier2_advanced' && (
+            <button
+              id="nav-kyc-btn"
+              onClick={() => setIsKYCModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/20 transition-all"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('kyc')}</span>
+            </button>
+          )}
 
           {isUserLoggedIn ? (
             <button
@@ -245,6 +258,9 @@ export const Header: React.FC = () => {
             >
               <User className="w-3.5 h-3.5 text-cyan-400" />
               <span>{t('profile')}</span>
+              {user.kycTier === 'tier2_advanced' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400" title="Đã xác thực KYC Cấp 2" />
+              )}
             </button>
           ) : (
             <button
@@ -462,133 +478,244 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Drawer / Slide-down Menu */}
+      {/* Mobile Drawer / Slide-down Menu (High-Tech Customer Dossier & Navigation) */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-800 bg-slate-950/95 p-4 space-y-4 animate-fade-in backdrop-blur-xl shadow-2xl">
+        <div className="lg:hidden border-t border-slate-800 bg-slate-950/98 p-4 sm:p-5 space-y-4 animate-fade-in backdrop-blur-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
           
-          {/* User Status Card on Mobile */}
+          {/* 1. Customer Profile Dossier Card (Hồ Sơ Khách Hàng Công Nghệ Cao) */}
           {isUserLoggedIn ? (
-            <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            <div className="p-4 bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 rounded-2xl border border-cyan-500/30 shadow-xl space-y-3 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-cyan-500/20">
+                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <h4 className="text-sm font-bold text-white tracking-tight truncate max-w-[150px]">{user.name}</h4>
+                      <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full border ${
+                        user.kycTier === 'tier2_advanced'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      }`}>
+                        {user.kycTier === 'tier2_advanced' ? 'KYC Cấp 2' : 'KYC Cấp 1'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-mono">{user.email || user.phone}</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-white">{user.name}</div>
-                  <div className="text-[10px] text-slate-400">{user.email}</div>
+
+                <button
+                  onClick={logoutUserAccount}
+                  className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-xl text-xs font-semibold border border-rose-500/40 transition-colors flex items-center space-x-1"
+                >
+                  <LogOut className="w-3 h-3 text-rose-400" />
+                  <span>{t('logout')}</span>
+                </button>
+              </div>
+
+              {/* Monthly Trading Quota Progress */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Hạn mức tháng:</span>
+                  <span className="font-mono text-cyan-300 font-bold">
+                    {user.monthlyLimitVND.toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all duration-500"
+                    style={{ width: `${quotaPercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>Đã dùng: {user.monthlyUsedVND.toLocaleString('vi-VN')} ₫ ({quotaPercent}%)</span>
+                  <span className="text-emerald-400">Còn lại: {remainingQuota.toLocaleString('vi-VN')} ₫</span>
                 </div>
               </div>
-              <button
-                onClick={logoutUserAccount}
-                className="px-2.5 py-1 bg-rose-950/60 text-rose-300 rounded-lg text-xs font-semibold border border-rose-500/40"
-              >
-                {t('logout')}
-              </button>
+
+              {/* Security Pill Indicators */}
+              <div className="flex items-center space-x-2 pt-1 text-[10px]">
+                <span className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 flex items-center space-x-1">
+                  <Fingerprint className="w-3 h-3 text-cyan-400" />
+                  <span>{user.biometricsEnabled ? 'Passkey: Đã bật' : '2FA: Tiêu chuẩn'}</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 flex items-center space-x-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span>Bảo mật: Cấp cao</span>
+                </span>
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  setIsUserAuthModalOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="py-2.5 rounded-xl bg-slate-900 text-cyan-300 border border-slate-750 text-xs font-bold"
-              >
-                {t('login')}
-              </button>
-              <button
-                onClick={() => {
-                  setIsUserAuthModalOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white text-xs font-bold"
-              >
-                {t('register')}
-              </button>
+            <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center space-x-2 text-slate-300">
+                <User className="w-5 h-5 text-cyan-400" />
+                <span className="text-xs font-bold text-white">Đăng nhập tài khoản để quản lý giao dịch & hạn mức</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => {
+                    setIsUserAuthModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-bold transition-colors"
+                >
+                  {t('login')}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsUserAuthModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-cyan-500/20"
+                >
+                  {t('register')}
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Navigation Links */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={() => navigateTo('exchange')}
-              className={`p-3 rounded-xl border text-left flex items-center space-x-2 font-semibold ${
-                activeTab === 'exchange'
-                  ? 'bg-cyan-950/40 border-cyan-500 text-cyan-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}
-            >
-              <ArrowLeftRight className="w-4 h-4 text-cyan-400" />
-              <span>{t('exchange')}</span>
-            </button>
-
-            <button
-              onClick={() => navigateTo('market')}
-              className={`p-3 rounded-xl border text-left flex items-center space-x-2 font-semibold ${
-                activeTab === 'market'
-                  ? 'bg-cyan-950/40 border-cyan-500 text-cyan-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-indigo-400" />
-              <span>{t('market')}</span>
-            </button>
-
-            <button
-              onClick={() => navigateTo('history')}
-              className={`p-3 rounded-xl border text-left flex items-center space-x-2 font-semibold ${
-                activeTab === 'history'
-                  ? 'bg-cyan-950/40 border-cyan-500 text-cyan-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}
-            >
-              <History className="w-4 h-4 text-emerald-400" />
-              <span>{t('history')}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsKYCModalOpen(true);
-                setIsMobileMenuOpen(false);
-              }}
-              className="p-3 rounded-xl border bg-slate-900 border-amber-500/30 text-amber-300 text-left flex items-center space-x-2 font-semibold"
-            >
-              <UserCheck className="w-4 h-4 text-amber-400" />
-              <span>{t('kyc')}</span>
-            </button>
-          </div>
-
-          {/* Direct Switch to Admin Website Button (Mobile) */}
-          <div className="pt-1">
-            <button
-              onClick={handleSwitchToAdmin}
-              className="w-full py-2.5 px-3 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center justify-between"
-            >
-              <div className="flex items-center space-x-2">
-                <LayoutDashboard className="w-4 h-4 text-purple-400" />
-                <span>{language === 'vi' ? 'Chuyển sang Website Quản Trị (Admin)' : 'Switch to Admin Portal'}</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
-                {isAdminUnlocked ? 'ĐÃ MỞ' : 'CẦN PIN'}
+          {/* 2. Categorized Navigation Links (Có Thứ Tự Rõ Ràng) */}
+          <div className="space-y-3">
+            {/* Nhóm 1: Giao Dịch & Thị Trường */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                1. Giao Dịch & Thị Trường
               </span>
-            </button>
-          </div>
+              <div className="grid grid-cols-1 gap-1.5 text-xs">
+                <button
+                  onClick={() => navigateTo('exchange')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between font-semibold transition-all ${
+                    activeTab === 'exchange'
+                      ? 'bg-cyan-950/50 border-cyan-500 text-cyan-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800/90 text-slate-300 hover:bg-slate-850'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <ArrowLeftRight className="w-4 h-4 text-cyan-400" />
+                    <span>{t('exchange')} (Mua & Bán OTC 24/7)</span>
+                  </div>
+                  <span className="text-[10px] text-cyan-400 font-mono">Tức thì</span>
+                </button>
 
-          {/* 24/7 AI Support on Mobile */}
-          <button
-            onClick={() => {
-              setIsSupportOpen(true);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 text-white text-xs font-bold flex items-center justify-center space-x-2"
-          >
-            <Headphones className="w-4 h-4" />
-            <span>Hỗ Trợ Khách Hàng 24/7 AI</span>
-          </button>
+                <button
+                  onClick={() => navigateTo('market')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between font-semibold transition-all ${
+                    activeTab === 'market'
+                      ? 'bg-cyan-950/50 border-cyan-500 text-cyan-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800/90 text-slate-300 hover:bg-slate-850'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <BarChart3 className="w-4 h-4 text-indigo-400" />
+                    <span>{t('market')} (Bảng Giá & Biểu Đồ Trực Tuyến)</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-400 font-mono">Real-time</span>
+                </button>
+
+                <button
+                  onClick={() => navigateTo('history')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between font-semibold transition-all ${
+                    activeTab === 'history'
+                      ? 'bg-cyan-950/50 border-cyan-500 text-cyan-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800/90 text-slate-300 hover:bg-slate-850'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <History className="w-4 h-4 text-emerald-400" />
+                    <span>{t('history')} (Lịch Sử Khách Hàng)</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">Sao kê</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Nhóm 2: Tài Khoản & Bảo Mật */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                2. Tài Khoản & Bảo Mật
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                {isUserLoggedIn && (
+                  <button
+                    onClick={() => navigateTo('profile')}
+                    className={`p-3 rounded-xl border text-left flex items-center space-x-2.5 font-semibold transition-all ${
+                      activeTab === 'profile'
+                        ? 'bg-cyan-950/50 border-cyan-500 text-cyan-300 shadow-sm'
+                        : 'bg-slate-900 border-slate-800/90 text-slate-300 hover:bg-slate-850'
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-cyan-400" />
+                    <span>{t('profile')} & Hạn Mức</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setIsSecurityModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="p-3 rounded-xl border bg-slate-900 border-slate-800 text-slate-300 text-left flex items-center space-x-2.5 font-semibold hover:bg-slate-850 transition-all"
+                >
+                  <Fingerprint className="w-4 h-4 text-purple-400" />
+                  <span>Xác Thực Passkey & 2FA</span>
+                </button>
+
+                {/* KYC option only shown if NOT yet Tier 2 verified */}
+                {user.kycTier !== 'tier2_advanced' && (
+                  <button
+                    onClick={() => {
+                      setIsKYCModalOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="p-3 rounded-xl border bg-slate-900 border-amber-500/40 text-amber-300 text-left flex items-center space-x-2.5 font-semibold hover:bg-amber-950/30 transition-all"
+                  >
+                    <UserCheck className="w-4 h-4 text-amber-400" />
+                    <span>Nâng Hạng Định Danh KYC (300M)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Nhóm 3: Tiện Ích & Hỗ Trợ Khách Hàng */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                3. Tiện Ích & Hỗ Trợ
+              </span>
+              <div className="grid grid-cols-1 gap-1.5 text-xs">
+                <button
+                  onClick={() => {
+                    setIsSupportOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="p-3 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-bold flex items-center justify-between shadow-md shadow-cyan-600/20"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Headphones className="w-4 h-4" />
+                    <span>Trợ Lý AI Hỗ Trợ Khách Hàng 24/7</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/20">Online</span>
+                </button>
+
+                <button
+                  onClick={handleSwitchToAdmin}
+                  className="p-3 rounded-xl bg-purple-950/70 hover:bg-purple-900 border border-purple-500/40 text-purple-300 font-bold flex items-center justify-between transition-colors shadow-sm"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <ShieldAlert className="w-4 h-4 text-purple-400" />
+                    <span>Cổng Đăng Nhập Quản Trị Viên (Admin Portal)</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-900/80 text-purple-200 border border-purple-600/50">Admin</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Modern Mobile Bottom Navigation Dock (High touch-target standard) */}
+      {/* Modern Mobile Bottom Navigation Dock (User-focused, without Admin clutter) */}
       <div className="lg:hidden flex items-center justify-around py-2 px-3 bg-slate-950/95 border-t border-slate-800 text-[10px] font-semibold backdrop-blur-lg">
         <button
           onClick={() => navigateTo('exchange')}
@@ -620,23 +747,25 @@ export const Header: React.FC = () => {
           <span>{t('history')}</span>
         </button>
 
-        <button
-          onClick={() => {
-            setIsKYCModalOpen(true);
-          }}
-          className="flex flex-col items-center py-1 px-3 rounded-xl transition-all min-h-[44px] justify-center text-amber-400"
-        >
-          <UserCheck className="w-4 h-4 mb-0.5" />
-          <span>{t('kyc')}</span>
-        </button>
-
-        <button
-          onClick={handleSwitchToAdmin}
-          className="flex flex-col items-center py-1 px-3 rounded-xl transition-all min-h-[44px] justify-center text-purple-400"
-        >
-          <LayoutDashboard className="w-4 h-4 mb-0.5" />
-          <span>Admin</span>
-        </button>
+        {isUserLoggedIn ? (
+          <button
+            onClick={() => navigateTo('profile')}
+            className={`flex flex-col items-center py-1 px-3 rounded-xl transition-all min-h-[44px] justify-center ${
+              activeTab === 'profile' ? 'text-cyan-400 font-bold bg-cyan-950/40' : 'text-slate-400'
+            }`}
+          >
+            <User className="w-4 h-4 mb-0.5" />
+            <span>{t('profile')}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsUserAuthModalOpen(true)}
+            className="flex flex-col items-center py-1 px-3 rounded-xl transition-all min-h-[44px] justify-center text-cyan-400"
+          >
+            <LogIn className="w-4 h-4 mb-0.5" />
+            <span>{t('login')}</span>
+          </button>
+        )}
       </div>
     </header>
   );

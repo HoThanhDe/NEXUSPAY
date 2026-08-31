@@ -9,6 +9,7 @@ import {
   ArrowLeftRight, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   Lock, 
   Eye, 
   EyeOff, 
@@ -22,7 +23,10 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownLeft,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  RefreshCw,
+  BadgeCheck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
@@ -217,32 +221,136 @@ export const UserProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* KYC Limit Status Card */}
-        <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 md:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        {/* KYC Detailed Status & Limit Management Card */}
+        <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 md:col-span-2 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
             <div className="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Hạn Mức & Cấp Độ Xác Thực KYC</span>
+              <ShieldCheck className="w-5 h-5 text-cyan-400" />
+              <span>Hạn Mức & Cấp Độ Xác Thực Danh Tính (KYC)</span>
             </div>
-            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-              user.kycStatus === 'verified' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-              user.kycStatus === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-              'bg-slate-800 text-slate-400'
-            }`}>
-              {user.kycStatus === 'verified' ? 'Đã Xác Thực' : user.kycStatus === 'pending' ? 'Đang Chờ Duyệt' : 'Chưa Nộp KYC'}
-            </span>
+            
+            {user.kycStatus === 'verified' ? (
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center space-x-1.5 shadow-sm shadow-emerald-500/10">
+                <BadgeCheck className="w-4 h-4 text-emerald-400" />
+                <span>Đã Phê Duyệt Cấp 2 (Verified)</span>
+              </span>
+            ) : user.kycStatus === 'pending' ? (
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1.5 animate-pulse">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Đang Chờ Quản Trị Viên Duyệt</span>
+              </span>
+            ) : user.kycStatus === 'rejected' ? (
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center space-x-1.5 shadow-sm shadow-rose-500/10">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span>Hồ Sơ Cần Bổ Sung / Bị Từ Chối</span>
+              </span>
+            ) : (
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                Chưa Gửi Hồ Sơ KYC
+              </span>
+            )}
           </div>
+
+          {/* Special Status Banners */}
+          {user.kycStatus === 'rejected' && (
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-2.5 animate-fade-in">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-300">
+                      Hồ Sơ Xác Minh KYC Của Bạn Chưa Được Phê Duyệt
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      {user.kycReviewedAt && (
+                        <span className="text-slate-400 font-mono text-[11px] mr-2">
+                          [Đã xét duyệt: {new Date(user.kycReviewedAt).toLocaleString('vi-VN')}]
+                        </span>
+                      )}
+                      Ban Quản Trị đã gửi lại phản hồi sau khi đối chiếu giấy tờ tùy thân.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsKYCModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-rose-600/30 flex items-center space-x-1.5 shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Nộp Lại Ngay</span>
+                </button>
+              </div>
+
+              {/* Explicit Rejection Reason Box */}
+              <div className="p-3 bg-slate-950/90 rounded-xl border border-rose-900/40 text-xs">
+                <span className="text-rose-400 font-bold block mb-1">
+                  Lý do từ chối cụ thể từ chuyên viên thẩm định:
+                </span>
+                <p className="text-rose-200 font-medium bg-rose-950/30 p-2 rounded-lg border border-rose-500/20">
+                  "{user.kycRejectionReason || 'Ảnh chụp CCCD bị mờ, mất góc hoặc thông tin họ tên, số định danh chưa trùng khớp với bản ghi.'}"
+                </p>
+                <div className="mt-2 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span>💡 <strong>Lưu ý khắc phục:</strong> Chụp ảnh nơi đủ sáng, không lóa flash, để thẳng góc đủ 4 cạnh của thẻ CCCD.</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {user.kycStatus === 'pending' && (
+            <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 space-y-2 animate-fade-in">
+              <div className="flex items-start space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-300">
+                    Đang Thẩm Định & Đối Soát Giấy Tờ Tùy Thân
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Hồ sơ của bạn đang được đội ngũ chuyên viên KYC đối chiếu số định danh và nhận diện khuôn mặt. Thời gian phê duyệt dự kiến trong vòng <strong>10 - 15 phút</strong>.
+                  </p>
+                  {user.kycSubmittedAt && (
+                    <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                      Thời gian gửi đơn: {new Date(user.kycSubmittedAt).toLocaleString('vi-VN')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {user.kycStatus === 'verified' && (
+            <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 space-y-1.5 animate-fade-in">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <BadgeCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-300">
+                    Tài Khoản Đã Xác Thực Cấp 2 Thành Công
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    Hạn mức tối đa <strong>300.000.000 ₫/tháng</strong> đã được kích hoạt đầy đủ. Bạn có thể giao dịch mua bán OTC tức thì qua VietQR và Thẻ Quốc Tế 24/7.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
-              <div className="text-slate-400">Cấp độ hiện tại</div>
-              <div className="text-base font-bold text-white">
-                {user.kycTier === 'tier2_advanced' ? 'Cấp 2 (Nâng Cao - 300 Triệu)' :
-                 user.kycTier === 'tier1_basic' ? 'Cấp 1 (Cơ Bản - 10 Triệu)' :
-                 'Cấp 0 (Chưa xác thực)'}
+              <div className="text-slate-400">Cấp độ định danh hiện tại</div>
+              <div className="text-base font-bold text-white flex items-center space-x-2">
+                <span>
+                  {user.kycTier === 'tier2_advanced' ? 'Cấp 2 (Nâng Cao - 300 Triệu)' :
+                   user.kycTier === 'tier1_basic' ? 'Cấp 1 (Cơ Bản - 10 Triệu)' :
+                   'Cấp 0 (Chưa xác thực)'}
+                </span>
               </div>
-              <div className="text-[11px] text-slate-500">
-                Hạn mức tối đa: {formatVND(user.monthlyLimitVND)} / tháng
+              <div className="text-[11px] text-slate-400">
+                Hạn mức mua bán: <strong className="text-emerald-400">{formatVND(user.monthlyLimitVND)}</strong> / tháng
               </div>
             </div>
 
@@ -258,20 +366,40 @@ export const UserProfileView: React.FC = () => {
                   style={{ width: `${Math.min(100, (user.monthlyUsedVND / Math.max(1, user.monthlyLimitVND)) * 100)}%` }}
                 />
               </div>
-              <div className="text-[10px] text-slate-500 text-right">
-                Còn lại: {formatVND(Math.max(0, user.monthlyLimitVND - user.monthlyUsedVND))}
+              <div className="text-[10px] text-slate-400 text-right">
+                Hạn mức khả dụng còn lại: <strong className="text-cyan-300">{formatVND(Math.max(0, user.monthlyLimitVND - user.monthlyUsedVND))}</strong>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-slate-400">Cần nâng thêm hạn mức giao dịch lên 300 triệu đồng?</span>
+          <div className="flex flex-wrap items-center justify-between pt-1 gap-3">
+            <span className="text-xs text-slate-400">
+              {user.kycStatus === 'verified'
+                ? 'Hồ sơ KYC đã được chứng nhận đạt chuẩn bảo mật cao nhất.'
+                : user.kycStatus === 'rejected'
+                ? 'Vui lòng bổ sung lại ảnh chụp giấy tờ rõ nét để mở lại hạn mức giao dịch.'
+                : 'Cần nâng thêm hạn mức giao dịch lên 300 triệu đồng/tháng?'}
+            </span>
             <button
               onClick={() => setIsKYCModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center space-x-1.5"
+              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-cyan-600/20 transition-all"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Nộp / Cập Nhật Hồ Sơ KYC</span>
+              {user.kycStatus === 'rejected' ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Chụp & Nộp Lại Hồ Sơ KYC</span>
+                </>
+              ) : user.kycStatus === 'verified' ? (
+                <>
+                  <BadgeCheck className="w-3.5 h-3.5" />
+                  <span>Xem Chi Tiết Hồ Sơ KYC Cấp 2</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Nộp / Cập Nhật Hồ Sơ KYC</span>
+                </>
+              )}
             </button>
           </div>
         </div>

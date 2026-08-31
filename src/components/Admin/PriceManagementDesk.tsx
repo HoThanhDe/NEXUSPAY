@@ -14,11 +14,13 @@ import {
   Percent,
   Calculator,
   Layers,
+  Fuel,
   ArrowRight
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { CryptoRate, P2PSpreadSettings, PricingMode } from '../../types';
+import { NetworkFeeManagementDesk } from './NetworkFeeManagementDesk';
 
 interface PriceManagementDeskProps {
   onRefreshAll: () => void;
@@ -26,6 +28,9 @@ interface PriceManagementDeskProps {
 
 export const PriceManagementDesk: React.FC<PriceManagementDeskProps> = ({ onRefreshAll }) => {
   const { rates, setRates, selectedRate, setSelectedRate, addNotification } = useApp();
+
+  // Sub-tab: 'pricing' (Định Giá & Tỷ Giá P2P) | 'network_fees' (Phí Mạng Lưới On-Chain)
+  const [subTab, setSubTab] = useState<'pricing' | 'network_fees'>('pricing');
 
   // Pricing Mode: 'percentage' (Theo Thị Trường Tính %) or 'fixed_vnd' (Cố Định Tự Nhận Linh Hoạt)
   const [pricingMode, setPricingMode] = useState<PricingMode>('percentage');
@@ -227,8 +232,44 @@ export const PriceManagementDesk: React.FC<PriceManagementDeskProps> = ({ onRefr
 
   return (
     <div className="w-full space-y-6">
-      {/* Top Banner with Quick Actions */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Desk Sub-Navigation Tabs */}
+      <div className="p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col sm:flex-row gap-1.5 shadow-xl">
+        <button
+          type="button"
+          onClick={() => setSubTab('pricing')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all ${
+            subTab === 'pricing'
+              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-900/40 border border-cyan-400/40'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>1. Quản Lý Tỷ Giá & Biên Độ P2P</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('network_fees')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all ${
+            subTab === 'network_fees'
+              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-900/40 border border-amber-400/40'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+          }`}
+        >
+          <Fuel className="w-4 h-4" />
+          <span>2. Điều Chỉnh Phí Mạng Lưới On-Chain (Network Fees)</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 ml-1 border border-amber-400/30">
+            Mới & Real-Time Gas
+          </span>
+        </button>
+      </div>
+
+      {subTab === 'network_fees' ? (
+        <NetworkFeeManagementDesk onRefreshAll={onRefreshAll} />
+      ) : (
+        <>
+          {/* Top Banner with Quick Actions */}
+          <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
@@ -665,6 +706,8 @@ export const PriceManagementDesk: React.FC<PriceManagementDeskProps> = ({ onRefr
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Notifications / Alerts */}
       {errorMessage && (

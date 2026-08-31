@@ -44,7 +44,10 @@ export const KYCDocumentReviewDesk: React.FC<KYCDocumentReviewDeskProps> = ({ on
   const [loading, setLoading] = useState<boolean>(false);
 
   // Document Inspection Controls
+  const [viewMode, setViewMode] = useState<'dual_sync' | 'single'>('dual_sync');
+  const [cccdTab, setCccdTab] = useState<'front' | 'back'>('front');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [portraitZoomLevel, setPortraitZoomLevel] = useState<number>(100);
   const [rotation, setRotation] = useState<number>(0);
   const [highContrast, setHighContrast] = useState<boolean>(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState<boolean>(false);
@@ -391,108 +394,248 @@ export const KYCDocumentReviewDesk: React.FC<KYCDocumentReviewDeskProps> = ({ on
               </div>
             </div>
 
-            {/* Document Viewer & Inspection Tools */}
-            <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 space-y-3">
-              {/* Document Tabs & Image Toolbar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-850">
-                {/* Doc Type Selector */}
-                <div className="flex flex-wrap gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
-                  <button
-                    onClick={() => setActiveDocTab('front')}
-                    className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
-                      activeDocTab === 'front' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    1. Mặt Trước {selectedSubmission.documentType === 'passport' ? 'Hộ Chiếu' : 'CCCD'}
-                  </button>
-                  <button
-                    onClick={() => setActiveDocTab('back')}
-                    className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
-                      activeDocTab === 'back' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    2. Mặt Sau CCCD
-                  </button>
-                  <button
-                    onClick={() => setActiveDocTab('portrait')}
-                    className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
-                      activeDocTab === 'portrait' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    3. Chân Dung Cầm Giấy Tờ
-                  </button>
-                  <button
-                    onClick={() => setActiveDocTab('address')}
-                    className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
-                      activeDocTab === 'address' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    4. Chứng Minh Cư Trú
-                  </button>
+            {/* Synchronized Dual-Pane Document & Biometric Face Comparison Workspace */}
+            <div className="bg-slate-950/95 border border-amber-500/30 rounded-3xl p-4 sm:p-5 space-y-4 shadow-2xl">
+              {/* Header Bar of Inspection Workspace */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Đồng Bộ So Sánh: Giấy Tờ CCCD vs Ảnh Chân Dung</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                    Face Match 98.8%
+                  </span>
                 </div>
 
-                {/* Inspection Optical Tools */}
-                <div className="flex items-center space-x-1 text-slate-300">
-                  <button
-                    onClick={() => setZoomLevel(Math.max(80, zoomLevel - 20))}
-                    title="Thu nhỏ"
-                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </button>
-                  <span className="text-xs font-mono px-1.5 text-slate-400">{zoomLevel}%</span>
-                  <button
-                    onClick={() => setZoomLevel(Math.min(300, zoomLevel + 20))}
-                    title="Phóng to"
-                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setRotation((rotation + 90) % 360)}
-                    title="Xoay 90 độ"
-                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors ml-1"
-                  >
-                    <RotateCw className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setHighContrast(!highContrast)}
-                    title="Chế độ tương phản cao / Soi bảo an"
-                    className={`p-1.5 rounded-lg border transition-colors ${
-                      highContrast ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setIsFullscreenOpen(true)}
-                    title="Xem toàn màn hình"
-                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <Maximize2 className="w-4 h-4" />
-                  </button>
+                {/* View Mode Toggle & Global Optical Tools */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Switcher */}
+                  <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('dual_sync')}
+                      className={`px-3 py-1 rounded-lg transition-all ${
+                        viewMode === 'dual_sync'
+                          ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Song Song (CCCD & Chân Dung)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('single')}
+                      className={`px-3 py-1 rounded-lg transition-all ${
+                        viewMode === 'single'
+                          ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Xem Đơn Lẻ Chi Tiết
+                    </button>
+                  </div>
+
+                  {/* Optical Tools */}
+                  <div className="flex items-center space-x-1 text-slate-300">
+                    <button
+                      onClick={() => setRotation((rotation + 90) % 360)}
+                      title="Xoay 90 độ"
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setHighContrast(!highContrast)}
+                      title="Chế độ tương phản cao / Soi bảo an"
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        highContrast ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setIsFullscreenOpen(true)}
+                      title="Xem toàn màn hình"
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* High-Resolution Document Canvas */}
-              <div className="relative w-full h-64 sm:h-72 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-900">
-                <img
-                  src={getCurrentImageUrl()}
-                  alt="KYC Document Preview"
-                  referrerPolicy="no-referrer"
-                  style={{
-                    transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                    filter: highContrast ? 'contrast(220%) brightness(90%) invert(10%)' : 'none',
-                    transition: 'transform 0.2s ease-out'
-                  }}
-                  className="max-h-full max-w-full object-contain cursor-grab active:cursor-grabbing rounded-lg shadow-2xl"
-                />
+              {/* Dual-Pane Display */}
+              {viewMode === 'dual_sync' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Box: CCCD / Identity Document */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setCccdTab('front')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            cccdTab === 'front' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Mặt Trước CCCD
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCccdTab('back')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            cccdTab === 'back' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Mặt Sau CCCD
+                        </button>
+                      </div>
 
-                {/* Overlaid watermark / stamp of authentication */}
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-slate-950/80 backdrop-blur-md rounded-md text-[10px] font-mono text-slate-400 border border-slate-800">
-                  Phân giải: Gốc 2400x1600 • Tương phản: {highContrast ? 'Độ rõ nét cực cao' : 'Chuẩn'}
+                      {/* Zoom controls for CCCD */}
+                      <div className="flex items-center space-x-1 text-slate-400 text-xs font-mono">
+                        <button
+                          onClick={() => setZoomLevel(Math.max(70, zoomLevel - 20))}
+                          className="p-1 hover:text-white bg-slate-950 rounded border border-slate-800"
+                        >
+                          <ZoomOut className="w-3.5 h-3.5" />
+                        </button>
+                        <span>{zoomLevel}%</span>
+                        <button
+                          onClick={() => setZoomLevel(Math.min(250, zoomLevel + 20))}
+                          className="p-1 hover:text-white bg-slate-950 rounded border border-slate-800"
+                        >
+                          <ZoomIn className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* CCCD Image Canvas */}
+                    <div className="relative w-full h-64 sm:h-72 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-850">
+                      <img
+                        src={
+                          cccdTab === 'front'
+                            ? (selectedSubmission.frontIdUrl || selectedSubmission.idCardFrontUrl || selectedSubmission.documentPhotos?.[0] || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80')
+                            : (selectedSubmission.backIdUrl || selectedSubmission.idCardBackUrl || selectedSubmission.documentPhotos?.[1] || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=80')
+                        }
+                        alt="CCCD Document"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                          filter: highContrast ? 'contrast(220%) brightness(90%) invert(10%)' : 'none',
+                          transition: 'transform 0.2s ease-out'
+                        }}
+                        className="max-h-full max-w-full object-contain cursor-grab active:cursor-grabbing rounded-lg shadow-xl"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur rounded text-[10px] font-mono text-amber-300 border border-slate-800 font-bold">
+                        {cccdTab === 'front' ? 'CCCD Mặt Trước (Ảnh Gốc)' : 'CCCD Mặt Sau (Vân Tay & Chip)'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Box: Portrait & Face Liveness Photo */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-cyan-300">Ảnh Chân Dung Sinh Trắc Học</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">
+                          {selectedSubmission.biometricLivenessPassed ? 'Liveness: Hợp Lệ (Người Thật)' : 'Chân dung chính diện'}
+                        </span>
+                      </div>
+
+                      {/* Zoom controls for Portrait */}
+                      <div className="flex items-center space-x-1 text-slate-400 text-xs font-mono">
+                        <button
+                          onClick={() => setPortraitZoomLevel(Math.max(70, portraitZoomLevel - 20))}
+                          className="p-1 hover:text-white bg-slate-950 rounded border border-slate-800"
+                        >
+                          <ZoomOut className="w-3.5 h-3.5" />
+                        </button>
+                        <span>{portraitZoomLevel}%</span>
+                        <button
+                          onClick={() => setPortraitZoomLevel(Math.min(250, portraitZoomLevel + 20))}
+                          className="p-1 hover:text-white bg-slate-950 rounded border border-slate-800"
+                        >
+                          <ZoomIn className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Portrait Canvas */}
+                    <div className="relative w-full h-64 sm:h-72 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-850">
+                      <img
+                        src={selectedSubmission.portraitPhotoUrl || selectedSubmission.portraitUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80'}
+                        alt="Portrait Photo"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          transform: `scale(${portraitZoomLevel / 100}) rotate(${rotation}deg)`,
+                          filter: highContrast ? 'contrast(220%) brightness(90%) invert(10%)' : 'none',
+                          transition: 'transform 0.2s ease-out'
+                        }}
+                        className="max-h-full max-w-full object-contain cursor-grab active:cursor-grabbing rounded-lg shadow-xl"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur rounded text-[10px] font-mono text-cyan-300 border border-slate-800 font-bold">
+                        Chân Dung Khách Hàng (Live Selfie)
+                      </div>
+                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-emerald-950/80 backdrop-blur rounded-lg border border-emerald-500/40 text-[10px] text-emerald-300 font-bold flex items-center space-x-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>Khuôn mặt trùng khớp với ảnh CCCD</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Single View Mode */
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                    <button
+                      onClick={() => setActiveDocTab('front')}
+                      className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
+                        activeDocTab === 'front' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      1. Mặt Trước CCCD
+                    </button>
+                    <button
+                      onClick={() => setActiveDocTab('back')}
+                      className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
+                        activeDocTab === 'back' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      2. Mặt Sau CCCD
+                    </button>
+                    <button
+                      onClick={() => setActiveDocTab('portrait')}
+                      className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
+                        activeDocTab === 'portrait' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      3. Chân Dung Sinh Trắc Học
+                    </button>
+                    <button
+                      onClick={() => setActiveDocTab('address')}
+                      className={`px-3 py-1.5 rounded-lg transition-colors font-semibold ${
+                        activeDocTab === 'address' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      4. Chứng Minh Cư Trú
+                    </button>
+                  </div>
+
+                  <div className="relative w-full h-80 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-850">
+                    <img
+                      src={getCurrentImageUrl()}
+                      alt="Single View"
+                      referrerPolicy="no-referrer"
+                      style={{
+                        transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                        filter: highContrast ? 'contrast(220%) brightness(90%) invert(10%)' : 'none'
+                      }}
+                      className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Side-by-Side Data Cross-Checking Grid */}

@@ -2,19 +2,13 @@ import React, { useState } from 'react';
 import { 
   ShieldAlert, 
   ShieldCheck, 
-  ArrowLeft, 
   Lock, 
-  Globe, 
   Bell, 
   RefreshCw, 
   LayoutDashboard,
   Server,
   Activity,
-  UserCheck,
-  Zap,
-  TrendingUp,
-  Sliders,
-  DollarSign,
+  LogOut,
   ChevronDown,
   CheckCircle2,
   AlertCircle
@@ -33,31 +27,32 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onRefreshData }) => {
     t, 
     setCurrentPortal, 
     lockAdminSession, 
-    isAdminUnlocked,
     setActiveTab,
     notifications,
     unreadCount,
     markNotificationsAsRead,
-    addNotification
+    addNotification,
+    currentAdmin,
+    isMasterAdmin
   } = useApp();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const langNames: Record<Language, { label: string; flag: string }> = {
-    vi: { label: 'Tiếng Việt', flag: '🇻🇳' },
-    en: { label: 'English', flag: '🇺🇸' },
-    ja: { label: '日本語', flag: '🇯🇵' },
-    zh: { label: '中文', flag: '🇨🇳' }
-  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     if (onRefreshData) onRefreshData();
     setTimeout(() => {
       setIsRefreshing(false);
-      addNotification('info', 'Đã cập nhật dữ liệu', 'Dữ liệu giao dịch, KYC và thị trường đã được làm mới.');
+      addNotification('info', 'Đã cập nhật dữ liệu', 'Dữ liệu giao dịch, KYC và thị trường đã được làm mới.', undefined, 'admin');
     }, 600);
+  };
+
+  const handleAdminLogout = () => {
+    lockAdminSession();
+    setCurrentPortal('user');
+    setActiveTab('exchange');
+    addNotification('system_alert', 'Đã đăng xuất', 'Phiên làm việc quản trị đã kết thúc.', undefined, 'admin');
   };
 
   return (
@@ -85,21 +80,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onRefreshData }) => {
             </div>
           </div>
 
-          {/* Quick Exit to Client Website Button */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <button
-              type="button"
-              id="admin-return-client-btn"
-              onClick={() => {
-                setCurrentPortal('user');
-                setActiveTab('exchange');
-              }}
-              className="flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-white border border-cyan-500/30 text-[11px] font-bold transition-all shadow-sm"
-              title="Quay lại giao diện người dùng mua bán crypto"
-            >
-              <ArrowLeft className="w-3 h-3 text-cyan-400" />
-              <span>{language === 'vi' ? 'Website Khách Hàng' : 'Client Website'}</span>
-            </button>
+          {/* Admin Identity Status */}
+          <div className="flex items-center space-x-2 shrink-0 text-[11px]">
+            <span className="text-slate-400">Tài khoản:</span>
+            <span className="font-mono font-bold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-md border border-purple-800/60">
+              @{currentAdmin?.username || 'Admin'}
+            </span>
           </div>
 
         </div>
@@ -123,32 +109,23 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onRefreshData }) => {
               </span>
             </div>
             <p className="text-[9px] sm:text-[10px] text-purple-300/70 font-medium leading-none hidden sm:block">
-              {language === 'vi' ? 'Hệ Thống Quản Trị Toàn Quyền OTC & Gateway' : 'Master Management & Operations Desk'}
+              {language === 'vi' ? 'Hệ Thống Quản Trị Phân Quyền & Báo Cáo Kế Toán' : 'Administrative Operations & Accounting Desk'}
             </p>
           </div>
         </div>
 
-        {/* Center Portal Switcher Pill (Desktop) */}
-        <div className="hidden lg:flex items-center bg-slate-900/90 p-1 rounded-2xl border border-purple-900/40 shadow-inner">
-          <button
-            type="button"
-            onClick={() => {
-              setCurrentPortal('user');
-              setActiveTab('exchange');
-            }}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-all"
-          >
-            <Globe className="w-3.5 h-3.5 text-slate-400" />
-            <span>{t('clientPortal')}</span>
-          </button>
-          
-          <div className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30 border border-purple-400/30">
-            <LayoutDashboard className="w-3.5 h-3.5 text-amber-300" />
-            <span>{t('adminPortal')}</span>
-          </div>
+        {/* Center Admin Badge Indicator */}
+        <div className="hidden md:flex items-center bg-slate-900/90 px-4 py-2 rounded-2xl border border-purple-900/40 shadow-inner space-x-2">
+          <LayoutDashboard className="w-4 h-4 text-purple-400" />
+          <span className="text-xs font-bold text-white">Bảng Điều Khiển Quản Trị Hệ Thống</span>
+          {isMasterAdmin && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              Master Admin
+            </span>
+          )}
         </div>
 
-        {/* Right Tools: Refresh, Language, Notifications, Lock Admin */}
+        {/* Right Tools: Refresh, Language, Notifications, Logout */}
         <div className="flex items-center space-x-2 sm:space-x-2.5">
           
           {/* Refresh Real-time Data Button */}
@@ -204,37 +181,40 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onRefreshData }) => {
                 setIsNotifOpen(!isNotifOpen);
                 if (!isNotifOpen) markNotificationsAsRead();
               }}
-              className="relative p-2 sm:p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-slate-300 transition-colors"
-              title="Thông báo quản trị"
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-purple-300 transition-colors relative"
+              title="Thông báo hệ thống"
             >
-              <Bell className="w-4 h-4 text-purple-300" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-bounce">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
                   {unreadCount}
                 </span>
               )}
             </button>
 
             {isNotifOpen && (
-              <div className="absolute right-0 mt-2 w-[85vw] max-w-sm bg-slate-900 border border-purple-900/50 rounded-2xl shadow-2xl z-50 p-3 backdrop-blur-xl animate-fade-in">
-                <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Thông Báo Hệ Thống</h4>
-                  <span className="text-[10px] text-purple-400 font-mono">{notifications.length} tin</span>
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-slate-900 border border-purple-900/60 shadow-2xl p-4 z-50 animate-fade-in text-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <h4 className="font-bold text-white flex items-center space-x-1.5">
+                    <ShieldAlert className="w-4 h-4 text-purple-400" />
+                    <span>Thông Báo Quản Trị</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">{notifications.length} bản ghi</span>
                 </div>
-                <div className="max-h-72 overflow-y-auto space-y-2 py-2 scrollbar-none">
+
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                   {notifications.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-4">Không có thông báo mới.</p>
+                    <p className="text-center text-slate-500 py-4">Chưa có thông báo nào</p>
                   ) : (
                     notifications.map(n => (
-                      <div key={n.id} className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-                        <div className="flex items-center space-x-1.5 font-bold text-purple-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                          <span className="truncate">{n.title}</span>
+                      <div key={n.id} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <strong className="text-purple-300 font-semibold">{n.title}</strong>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{n.message}</p>
-                        <span className="text-[9px] text-slate-500 mt-1 block font-mono">
-                          {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <p className="text-slate-300 text-[11px] leading-relaxed">{n.message}</p>
                       </div>
                     ))
                   )}
@@ -243,21 +223,15 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onRefreshData }) => {
             )}
           </div>
 
-          {/* Lock Session Button */}
+          {/* Safe Admin Logout Button */}
           <button
             type="button"
-            id="admin-lock-session-btn"
-            onClick={() => {
-              lockAdminSession();
-              setCurrentPortal('user');
-              setActiveTab('exchange');
-              addNotification('info', 'Đã khóa phiên quản trị an toàn', 'Đã chuyển về Website Khách Hàng.');
-            }}
-            className="flex items-center space-x-1.5 px-3 py-2 bg-rose-950/70 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 rounded-xl text-xs font-bold transition-all shadow-sm"
-            title="Khóa quyền quản trị và chuyển về Website Khách Hàng"
+            onClick={handleAdminLogout}
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 text-xs font-bold transition-all shadow-sm"
+            title="Đăng xuất khỏi phiên quản trị"
           >
-            <Lock className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">Khóa Admin</span>
+            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Đăng Xuất</span>
           </button>
 
         </div>

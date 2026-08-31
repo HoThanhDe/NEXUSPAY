@@ -6,6 +6,7 @@ import {
   Camera, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   Fingerprint, 
   Sparkles,
   ArrowRight,
@@ -446,7 +447,53 @@ export const KYCCenterModal: React.FC = () => {
           </div>
         )}
 
-        {successMessage ? (
+        {user.kycTier === 'tier2_advanced' ? (
+          /* Certified KYC Status Card for Already Approved Users */
+          <div className="py-6 text-center space-y-5 animate-fade-in">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider">
+                Hồ Sơ Đã Được Thẩm Định & Phê Duyệt
+              </span>
+              <h4 className="text-xl font-extrabold text-white pt-2">Xác Minh KYC Cấp 2 Hoàn Tất</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Tài khoản của bạn đã được cấp hạn mức giao dịch tối đa <strong className="text-emerald-400">300.000.000 ₫/tháng</strong> với đầy đủ tính năng OTC 24/7 và đối soát tự động.
+              </p>
+            </div>
+
+            {/* Verified Details Card */}
+            <div className="max-w-md mx-auto p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-left text-xs space-y-2 font-mono">
+              <div className="flex justify-between py-1 border-b border-slate-850">
+                <span className="text-slate-400 font-sans">Họ và tên:</span>
+                <span className="font-bold text-white">{user.name}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-850">
+                <span className="text-slate-400 font-sans">Số CCCD / Hộ chiếu:</span>
+                <span className="font-bold text-amber-300">{user.idCardNumber || '079094012345'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-850">
+                <span className="text-slate-400 font-sans">Hạn mức tháng:</span>
+                <span className="text-emerald-400 font-bold">{user.monthlyLimitVND.toLocaleString('vi-VN')} ₫</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400 font-sans">Sinh trắc học & Liveness:</span>
+                <span className="text-cyan-300">Đã đối khớp 100%</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-center space-x-3">
+              <button
+                onClick={() => setIsKYCModalOpen(false)}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors"
+              >
+                {t('close')}
+              </button>
+            </div>
+          </div>
+        ) : successMessage ? (
           <div className="py-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8" />
@@ -465,6 +512,23 @@ export const KYCCenterModal: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmitKYC} className="mt-5 space-y-5">
+            {/* Rejection Notice Banner */}
+            {user.kycStatus === 'rejected' && (
+              <div className="p-4 rounded-2xl bg-rose-950/50 border border-rose-500/40 text-xs space-y-2 animate-fade-in">
+                <div className="flex items-center space-x-2 text-rose-300 font-bold text-sm">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>Hồ sơ trước đó chưa đạt: Ban Quản Trị yêu cầu bổ sung/chụp lại</span>
+                </div>
+                <div className="p-3 bg-slate-950/80 rounded-xl border border-rose-900/40 text-rose-200">
+                  <span className="text-[11px] text-rose-400 font-semibold block mb-0.5">Lý do từ chối:</span>
+                  <p className="font-medium">"{user.kycRejectionReason || 'Ảnh chụp CCCD bị mờ, mất góc hoặc thông tin họ tên, số định danh chưa trùng khớp với bản ghi.'}"</p>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  👉 Vui lòng chụp lại ảnh CCCD 2 mặt rõ nét, đầy đủ 4 góc, và kiểm tra lại số định danh bên dưới trước khi bấm nộp lại.
+                </p>
+              </div>
+            )}
+
             {/* Tier Selection Cards */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-2">Chọn cấp bậc xác thực mong muốn:</label>

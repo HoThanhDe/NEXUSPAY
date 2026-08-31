@@ -23,6 +23,7 @@ import { UserProfileView } from './components/User/UserProfileView';
 import { SupportChatModal } from './components/Support/SupportChatModal';
 import { 
   ShieldCheck, 
+  ShieldAlert,
   Lock, 
   Zap, 
   Headphones, 
@@ -41,6 +42,7 @@ const MainContent: React.FC = () => {
     currentPortal, 
     setCurrentPortal, 
     isAdminUnlocked, 
+    setIsAdminAuthModalOpen,
     t, 
     language,
     setIsSupportOpen, 
@@ -227,13 +229,30 @@ const MainContent: React.FC = () => {
             <span className="font-semibold text-slate-400">NEXUS Pay & Crypto Gateway © 2026</span>
           </div>
 
-          <div className="flex items-center space-x-6 text-[11px]">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-[11px]">
             <span className="flex items-center space-x-1 text-emerald-400">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>PCI-DSS Level 1 & SOC2 Compliant</span>
             </span>
             <span>Stripe Verified</span>
             <span>VietQR 24/7 Certified</span>
+            <button
+              type="button"
+              id="footer-admin-portal-btn"
+              onClick={() => {
+                if (isAdminUnlocked) {
+                  setCurrentPortal('admin');
+                  setActiveTab('admin');
+                } else {
+                  setIsAdminAuthModalOpen(true);
+                }
+              }}
+              className="flex items-center space-x-1 text-purple-400 hover:text-purple-300 transition-colors font-semibold px-2 py-0.5 rounded-md hover:bg-purple-950/40 border border-purple-500/20"
+              title="Cổng Đăng Nhập Quản Trị Viên (Admin Portal)"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>{language === 'vi' ? 'Cổng Admin' : 'Admin Portal'}</span>
+            </button>
           </div>
         </div>
       </footer>

@@ -22,7 +22,11 @@ import {
   LogOut,
   UserCheck,
   Lock,
-  User
+  User,
+  Fuel,
+  Receipt,
+  X,
+  Check
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CryptoNetwork, PaymentMethod } from '../../types';
@@ -57,40 +61,35 @@ export const ExchangeWidget: React.FC = () => {
   const [cryptoAmount, setCryptoAmount] = useState<number>(100);
   
   const [selectedNetwork, setSelectedNetwork] = useState<CryptoNetwork>('TRC20');
-  const [recipientWallet, setRecipientWallet] = useState<string>('TYDzsYbm7xXG7xKvZ1Rmqw76sXb484X9Jk');
+  const [recipientWallet, setRecipientWallet] = useState<string>('');
   
   // Bank Payout details for 'sell' mode
-  const [bankName, setBankName] = useState<string>(user.bankAccount?.bankName || 'Vietcombank (VCB)');
-  const [accountNumber, setAccountNumber] = useState<string>(user.bankAccount?.accountNumber || '10188992233');
-  const [accountName, setAccountName] = useState<string>(user.bankAccount?.accountName || 'NGUYEN VAN AN');
+  const [bankName, setBankName] = useState<string>(user.bankAccount?.bankName || '');
+  const [accountNumber, setAccountNumber] = useState<string>(user.bankAccount?.accountNumber || '');
+  const [accountName, setAccountName] = useState<string>(user.bankAccount?.accountName || '');
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe_card');
   const [lockTimer, setLockTimer] = useState<number>(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isQuickApproving, setIsQuickApproving] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [showP2PComparison, setShowP2PComparison] = useState(false);
 
-  // Quick 1-click Admin KYC Approval for Testing/Demo
-  const handleQuickAdminApprove = async (tier: 'tier1_basic' | 'tier2_advanced') => {
-    setIsQuickApproving(true);
-    try {
-      const res = await api.updateUserTier(user.id, tier);
-      if (res.success) {
-        await refreshUser();
-        addNotification(
-          'kyc_update',
-          'Quản trị viên đã phê duyệt KYC!',
-          `Tài khoản đã được nâng lên ${tier === 'tier2_advanced' ? 'Cấp 2 (Hạn mức 300.000.000 ₫)' : 'Cấp 1 (Hạn mức 10.000.000 ₫)'}. Bạn đã có thể Mua & Bán Crypto ngay lập tức!`
-        );
-        setOrderError(null);
-      }
-    } catch (err: any) {
-      console.error('Quick approve error:', err);
-    } finally {
-      setIsQuickApproving(false);
+  // Transaction Summary Modal state
+  const [isTransactionSummaryOpen, setIsTransactionSummaryOpen] = useState(false);
+  const [walletCopiedInModal, setWalletCopiedInModal] = useState(false);
+
+  // Sync bank details if user logs in with saved bank details
+  useEffect(() => {
+    if (user.bankAccount?.bankName && !bankName) {
+      setBankName(user.bankAccount.bankName);
     }
-  };
+    if (user.bankAccount?.accountNumber && !accountNumber) {
+      setAccountNumber(user.bankAccount.accountNumber);
+    }
+    if (user.bankAccount?.accountName && !accountName) {
+      setAccountName(user.bankAccount.accountName);
+    }
+  }, [user]);
 
   // Rate lock timer
   useEffect(() => {
@@ -107,12 +106,13 @@ export const ExchangeWidget: React.FC = () => {
     }
   }, [selectedRate.symbol]);
 
-  // Active rate depending on buy vs sell
-  const activeRateVND = tradeMode === 'buy' ? selectedRate.buyPriceVND : selectedRate.sellPriceVND;
-  const activeNetworkConfig = selectedRate.networks.find(n => n.network === selectedNetwork) || selectedRate.networks[0];
-  const networkFeeVND = tradeMode === 'buy' ? (activeNetworkConfig?.feeVND || 25000) : 0;
+  // Active rate depending on buy vs sell - always read from latest rates
+  const currentRate = rates.find(r => r.symbol === selectedRate.symbol) || selectedRate;
+  const activeRateVND = tradeMode === 'buy' ? currentRate.buyPriceVND : currentRate.sellPriceVND;
+  const activeNetworkConfig = currentRate.networks?.find(n => n.network === selectedNetwork) || currentRate.networks?.[0];
+  const networkFeeVND = tradeMode === 'buy' ? (activeNetworkConfig?.feeVND ?? 0) : 0;
   const gatewayFeeVND = (tradeMode === 'buy' && paymentMethod.startsWith('stripe')) ? Math.round(fiatAmountVND * 0.01) : 0;
-  const totalPaymentVND = fiatAmountVND + networkFeeVND + gatewayFeeVND;
+  const totalPaymentVND = tradeMode === 'buy' ? (fiatAmountVND + networkFeeVND + gatewayFeeVND) : fiatAmountVND;
 
   // Handle fiat input change
   const handleFiatChange = (val: number) => {
@@ -154,7 +154,7 @@ export const ExchangeWidget: React.FC = () => {
     { label: '10.000.000 ₫', value: 10000000 },
   ];
 
-  const handleProceed = async () => {
+  const handleProceed = () => {
     setOrderError(null);
 
     // STEP 1 & 2: User must be registered & logged in
@@ -195,7 +195,14 @@ export const ExchangeWidget: React.FC = () => {
       }
     }
 
+    // Open Transparent Transaction Summary Modal for User Confirmation
+    setIsTransactionSummaryOpen(true);
+  };
+
+  const executeOrderCreation = async () => {
     setIsSubmitting(true);
+    setOrderError(null);
+
     try {
       if (tradeMode === 'buy') {
         const res = await api.createOrder({
@@ -210,6 +217,7 @@ export const ExchangeWidget: React.FC = () => {
 
         if (res.success && res.order) {
           setActiveOrder(res.order);
+          setIsTransactionSummaryOpen(false);
           if (paymentMethod.startsWith('stripe')) {
             setIsStripeModalOpen(true);
           } else {
@@ -236,6 +244,7 @@ export const ExchangeWidget: React.FC = () => {
 
         if (res.success && res.order) {
           setActiveOrder(res.order);
+          setIsTransactionSummaryOpen(false);
           setIsOrderConfirmOpen(true);
           addNotification(
             'crypto_sent',
@@ -658,20 +667,33 @@ export const ExchangeWidget: React.FC = () => {
                 <span className="text-cyan-400 font-mono">Xác thực: ~{activeNetworkConfig?.estimatedSeconds || 30}s</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {selectedRate.networks.map(net => (
-                  <button
-                    key={net.network}
-                    onClick={() => setSelectedNetwork(net.network)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 ${
-                      selectedNetwork === net.network
-                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
-                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'
-                    }`}
-                  >
-                    <span>{net.network}</span>
-                    <span className="text-[10px] opacity-80">({net.feeVND.toLocaleString('vi-VN')}₫)</span>
-                  </button>
-                ))}
+                {(currentRate.networks || selectedRate.networks || []).map(net => {
+                  const isSuspended = net.status === 'suspended';
+                  return (
+                    <button
+                      key={net.network}
+                      type="button"
+                      disabled={isSuspended}
+                      onClick={() => !isSuspended && setSelectedNetwork(net.network)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+                        isSuspended
+                          ? 'bg-slate-900/60 text-slate-500 border border-slate-800 opacity-60 cursor-not-allowed'
+                          : selectedNetwork === net.network
+                            ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
+                            : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'
+                      }`}
+                    >
+                      <span>{net.network}</span>
+                      {isSuspended ? (
+                        <span className="text-[10px] text-rose-400 font-bold">(Bảo trì)</span>
+                      ) : (
+                        <span className="text-[10px] opacity-80 font-mono">
+                          ({net.feeVND === 0 ? '0₫' : `${net.feeVND.toLocaleString('vi-VN')}₫`})
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -811,17 +833,26 @@ export const ExchangeWidget: React.FC = () => {
           <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-850 space-y-1.5 text-xs text-slate-400">
             <div className="flex justify-between">
               <span>{t('currentNexusRate')}:</span>
-              <span className="font-mono text-slate-200">1 {selectedRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫</span>
+              <span className="font-mono text-slate-200">1 {currentRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫</span>
             </div>
             <div className="flex justify-between">
               <span>{t('p2pBenchmarkLabel')} (Binance/Bybit):</span>
-              <span className="font-mono text-cyan-400">{selectedRate.baseP2PVND.toLocaleString('vi-VN')} ₫</span>
+              <span className="font-mono text-cyan-400">{currentRate.baseP2PVND.toLocaleString('vi-VN')} ₫</span>
             </div>
-            {tradeMode === 'buy' && (
+            {tradeMode === 'buy' ? (
               <>
-                <div className="flex justify-between">
-                  <span>{t('networkFee')}:</span>
-                  <span className="font-mono text-slate-200">{networkFeeVND.toLocaleString('vi-VN')} ₫</span>
+                <div className="flex justify-between items-center">
+                  <span>{t('networkFee')} ({selectedNetwork}):</span>
+                  {networkFeeVND === 0 ? (
+                    <span className="font-mono text-emerald-400 font-bold flex items-center space-x-1.5">
+                      <span>0 ₫</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-normal border border-emerald-500/30">
+                        Miễn phí
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-slate-200">{networkFeeVND.toLocaleString('vi-VN')} ₫</span>
+                  )}
                 </div>
                 {gatewayFeeVND > 0 && (
                   <div className="flex justify-between">
@@ -830,6 +861,16 @@ export const ExchangeWidget: React.FC = () => {
                   </div>
                 )}
               </>
+            ) : (
+              <div className="flex justify-between items-center">
+                <span>Phí xử lý giao dịch:</span>
+                <span className="font-mono text-emerald-400 font-bold flex items-center space-x-1.5">
+                  <span>0 ₫</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-normal border border-emerald-500/30">
+                    Miễn phí
+                  </span>
+                </span>
+              </div>
             )}
             <div className="flex justify-between pt-1.5 border-t border-slate-800 font-bold text-sm">
               <span className="text-white">{tradeMode === 'buy' ? t('totalPayment') : 'Tổng VND nhận về tài khoản'}:</span>
@@ -945,6 +986,245 @@ export const ExchangeWidget: React.FC = () => {
               <li>100% tự động qua Hợp đồng thông minh & Ngân hàng chính chủ, tuyệt đối không bị khóa tài khoản ngân hàng do dòng tiền bẩn.</li>
               <li>Thanh toán thẻ Visa/Mastercard toàn cầu qua Stripe hoặc VietQR Napas247 tức thì trong 15-30 giây.</li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Transparent Transaction Summary Modal */}
+      {isTransactionSummaryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl relative text-slate-200 max-h-[92vh] overflow-y-auto">
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setIsTransactionSummaryOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800/80 hover:bg-slate-800 transition-colors"
+              title="Đóng bảng tóm tắt"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center space-x-3 mb-4 pb-3 border-b border-slate-800">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-cyan-600/30">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base font-bold text-white tracking-tight">Tóm Tắt Giao Dịch & Bóc Tách Chi Phí</h3>
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/40">
+                    Minh Bạch 100%
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Vui lòng kiểm tra chi tiết bóc tách chi phí và phí mạng trước khi thanh toán
+                </p>
+              </div>
+            </div>
+
+            {/* Asset Headline Card */}
+            <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 mb-4 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-400 block font-medium">
+                  {tradeMode === 'buy' ? 'Khối lượng Crypto nhận:' : 'Khối lượng Crypto bán:'}
+                </span>
+                <span className="text-lg font-black text-white font-mono flex items-center space-x-1.5 mt-0.5">
+                  <span className={tradeMode === 'buy' ? 'text-emerald-400' : 'text-cyan-400'}>
+                    {tradeMode === 'buy' ? '+' : '-'}{cryptoAmount} {currentRate.symbol}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono font-normal border border-slate-700">
+                    {selectedNetwork}
+                  </span>
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block">Tỷ giá P2P áp dụng</span>
+                <span className="text-xs font-mono font-bold text-cyan-300">
+                  1 {currentRate.symbol} = {activeRateVND.toLocaleString('vi-VN')} ₫
+                </span>
+              </div>
+            </div>
+
+            {/* Transparent Cost Breakdown Table */}
+            <div className="space-y-2.5 text-xs">
+              <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5 px-0.5">
+                <Fuel className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Bảng phân tích chi phí giao dịch chi tiết:</span>
+              </div>
+
+              {/* 1. Base Asset Amount */}
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">1. Tiền mua Token gốc (Base Amount):</span>
+                  <span className="text-slate-200 text-xs font-semibold">
+                    {cryptoAmount} {currentRate.symbol} × {activeRateVND.toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-white text-sm">
+                  {fiatAmountVND.toLocaleString('vi-VN')} ₫
+                </span>
+              </div>
+
+              {/* 2. Network Fee (Transparent Breakdown) */}
+              <div className={`p-3.5 rounded-2xl border transition-all ${
+                networkFeeVND === 0 
+                  ? 'bg-emerald-950/30 border-emerald-500/40 ring-1 ring-emerald-500/20' 
+                  : 'bg-slate-950/80 border-slate-800'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center space-x-1.5">
+                    <Fuel className={`w-4 h-4 ${networkFeeVND === 0 ? 'text-emerald-400' : 'text-amber-400'}`} />
+                    <span className="font-semibold text-slate-200">2. Phí mạng lưới On-Chain ({selectedNetwork}):</span>
+                  </div>
+                  <div className="text-right">
+                    {networkFeeVND === 0 ? (
+                      <span className="font-mono text-base font-black text-emerald-400 flex items-center space-x-1.5">
+                        <span>0 ₫</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
+                          ✨ Miễn phí
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="font-mono text-base font-bold text-amber-400 flex items-center space-x-1.5">
+                        <span>{networkFeeVND.toLocaleString('vi-VN')} ₫</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
+                          ~${activeNetworkConfig?.feeUSD ?? 1.2} USD
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Explanation text */}
+                <div className={`text-[11px] p-2 rounded-xl border leading-relaxed ${
+                  networkFeeVND === 0 
+                    ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30' 
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800'
+                }`}>
+                  {networkFeeVND === 0 ? (
+                    <div className="flex items-start space-x-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Chính sách 0đ phí Gas:</strong> Quản trị viên đã kích hoạt gói tài trợ 100% chi phí Gas on-chain cho mạng <strong>{selectedNetwork}</strong>. Quý khách nhận đủ trọn vẹn số Token mà không chịu thêm bất kỳ đồng phí mạng nào!
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start space-x-1.5">
+                      <Info className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Phí thợ đào / Gas On-chain chuyển token trực tiếp qua giao thức mạng <strong>{selectedNetwork}</strong> (Thời gian xử lý: ~{activeNetworkConfig?.estimatedSeconds || 30}s).
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Gateway Fee */}
+              {tradeMode === 'buy' && (
+                <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">
+                      3. Phí Cổng Thanh Toán ({paymentMethod === 'stripe_card' ? 'Thẻ Quốc Tế Stripe' : 'VietQR NAPAS 24/7'}):
+                    </span>
+                    <span className="text-slate-400 text-[10px]">
+                      {paymentMethod === 'stripe_card' ? '1% phí xử lý thẻ VISA / Mastercard' : 'Chuyển khoản liên ngân hàng 24/7 hoàn toàn miễn phí'}
+                    </span>
+                  </div>
+                  <span className={`font-mono font-bold ${gatewayFeeVND === 0 ? 'text-emerald-400' : 'text-slate-200'}`}>
+                    {gatewayFeeVND === 0 ? '0 ₫ (Miễn phí)' : `${gatewayFeeVND.toLocaleString('vi-VN')} ₫`}
+                  </span>
+                </div>
+              )}
+
+              {/* 4. Final Total Payment Box */}
+              <div className="p-3.5 bg-gradient-to-r from-slate-950 to-slate-900 border border-cyan-500/40 rounded-2xl flex items-center justify-between shadow-inner">
+                <div>
+                  <span className="text-slate-300 block text-xs font-bold">
+                    {tradeMode === 'buy' ? 'Tổng Số Tiền Cần Thanh Toán:' : 'Tổng Số Tiền Nhận Về Ngân Hàng:'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {tradeMode === 'buy' 
+                      ? `= Giá Token (${fiatAmountVND.toLocaleString('vi-VN')}₫) + Phí Mạng (${networkFeeVND === 0 ? '0₫' : `${networkFeeVND.toLocaleString('vi-VN')}₫`}) + Phí Cổng (${gatewayFeeVND}₫)` 
+                      : 'Không phụ phí ẩn, nhận đủ 100% tiền về ngân hàng'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xl sm:text-2xl font-black font-mono text-cyan-400">
+                    {totalPaymentVND.toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+              </div>
+
+              {/* Destination Address / Bank Confirmation */}
+              {tradeMode === 'buy' ? (
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+                  <span className="text-slate-400 block text-[11px] mb-1 font-medium">
+                    Địa chỉ ví nhận {currentRate.symbol} ({selectedNetwork}):
+                  </span>
+                  <div className="flex items-center justify-between space-x-2">
+                    <span className="font-mono text-xs text-white truncate max-w-[280px]">
+                      {recipientWallet}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(recipientWallet);
+                        setWalletCopiedInModal(true);
+                        setTimeout(() => setWalletCopiedInModal(false), 2000);
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center space-x-1"
+                    >
+                      {walletCopiedInModal ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{walletCopiedInModal ? 'Đã chép' : 'Sao chép'}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+                  <span className="text-slate-400 block text-[11px] mb-1 font-medium">Tài khoản ngân hàng nhận tiền VND:</span>
+                  <div className="text-xs text-slate-200 font-semibold">
+                    <Building2 className="w-3.5 h-3.5 text-cyan-400 inline mr-1" />
+                    <span>{bankName}</span> • <span className="font-mono text-white">{accountNumber}</span> • <span className="uppercase text-emerald-300">{accountName}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message inside Modal */}
+            {orderError && (
+              <div className="mt-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center space-x-2 text-rose-300 text-xs">
+                <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>{orderError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="mt-5 flex items-center space-x-2.5">
+              <button
+                type="button"
+                onClick={() => setIsTransactionSummaryOpen(false)}
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+              >
+                Quay lại chỉnh sửa
+              </button>
+
+              <button
+                type="button"
+                onClick={executeOrderCreation}
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <span>Đang khởi tạo đơn...</span>
+                ) : (
+                  <>
+                    <span>Xác nhận & Thanh toán ngay</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
